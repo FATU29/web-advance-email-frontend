@@ -6,6 +6,8 @@ import { EmailLayout } from '@/components/email/email-layout';
 import { MockSidebar } from '@/mocks/sidebar';
 import { mockEmails } from '@/mocks/emails';
 import { ParsedMessage } from '@/types';
+import { ChatDialog } from '@/components/ui/chat-dialog';
+import { type Message } from '@/components/ui/chat-message';
 
 export default function MailFolderPage({
   params: _params,
@@ -18,6 +20,9 @@ export default function MailFolderPage({
   const [selectedEmails, setSelectedEmails] = React.useState<Set<string>>(
     new Set()
   );
+  const [chatMessages, setChatMessages] = React.useState<Message[]>([]);
+  const [chatInput, setChatInput] = React.useState('');
+  const [isGenerating, setIsGenerating] = React.useState(false);
 
   //Init event handle
   const handleEmailSelect = (emailId: string, selected: boolean) => {
@@ -77,9 +82,52 @@ export default function MailFolderPage({
     // TODO: Implement logout functionality
   };
 
+  //Init chat handlers
+  const handleChatSubmit = (
+    event?: { preventDefault?: () => void },
+    _options?: { experimental_attachments?: FileList }
+  ) => {
+    event?.preventDefault?.();
+    if (!chatInput.trim()) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: chatInput,
+      createdAt: new Date(),
+    };
+
+    setChatMessages((prev) => [...prev, userMessage]);
+    setChatInput('');
+    setIsGenerating(true);
+
+    // TODO: Implement chat API call
+    // Simulate AI response
+    setTimeout(() => {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content:
+          'This is a placeholder response. Please implement the chat API.',
+        createdAt: new Date(),
+      };
+      setChatMessages((prev) => [...prev, aiMessage]);
+      setIsGenerating(false);
+    }, 1000);
+  };
+
+  const handleChatInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setChatInput(e.target.value);
+  };
+
+  const handleChatStop = () => {
+    setIsGenerating(false);
+    // TODO: Implement stop generation
+  };
+
   //Render
   return (
-    <div className="flex h-screen w-full flex-col">
+    <div className="relative flex h-screen w-full flex-col">
       <EmailLayout
         sidebar={
           <MockSidebar
@@ -101,6 +149,22 @@ export default function MailFolderPage({
         onStar={handleStar}
         className="h-full"
       />
+
+      {/* Sticky Chat Button */}
+      <div className="fixed bottom-4 right-4 z-50">
+        <ChatDialog
+          triggerSize="icon"
+          triggerVariant="default"
+          triggerClassName="h-14 w-14 rounded-full shadow-lg"
+          messages={chatMessages}
+          handleSubmit={handleChatSubmit}
+          input={chatInput}
+          handleInputChange={handleChatInputChange}
+          isGenerating={isGenerating}
+          stop={handleChatStop}
+          setMessages={setChatMessages}
+        />
+      </div>
     </div>
   );
 }
