@@ -59,6 +59,7 @@ export const mockSidebarItems: SidebarItem[] = [
 ];
 
 export const mockUser: User = {
+  id: 'mock-user',
   name: 'John Doe',
   email: 'john.doe@example.com',
   avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=John',
@@ -74,11 +75,13 @@ export interface MockSidebarProps {
 
 export function MockSidebar({
   items = mockSidebarItems,
-  user = mockUser,
+  user,
   onItemClick,
   onComposeClick,
   onLogoutClick,
 }: MockSidebarProps) {
+  // Use provided user or fallback to mock user
+  const displayUser = user || mockUser;
   //Init util function
   const getInitials = (name: string) => {
     return name
@@ -96,15 +99,17 @@ export function MockSidebar({
       <div className="border-b p-4">
         <div className="flex items-center gap-3">
           <Avatar className="size-10">
-            <AvatarImage src={user.avatar} alt={user.name} />
+            <AvatarImage src={displayUser.avatar} alt={displayUser.name} />
             <AvatarFallback className="bg-primary/10 text-primary">
-              {getInitials(user.name)}
+              {getInitials(displayUser.name)}
             </AvatarFallback>
           </Avatar>
           <div className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate text-sm font-semibold">{user.name}</span>
+            <span className="truncate text-sm font-semibold">
+              {displayUser.name}
+            </span>
             <span className="truncate text-xs text-muted-foreground">
-              {user.email}
+              {displayUser.email}
             </span>
           </div>
           {onLogoutClick && (

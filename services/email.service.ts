@@ -1,0 +1,104 @@
+import { axiosBI } from './axios.bi';
+import { CustomAxiosResponse } from './axios.bi';
+import {
+  ApiResponse,
+  IEmailListItem,
+  IEmailDetail,
+  IPaginatedResponse,
+  IGetEmailsParams,
+  IBulkEmailActionParams,
+} from '@/types/api.types';
+import { EMAIL_ENDPOINTS, MAILBOX_ENDPOINTS } from '@/utils/constants/api';
+
+//==================== REGION EMAIL SERVICE ====================
+
+/**
+ * Email Service
+ * Handles all email-related API calls
+ */
+class EmailService {
+  /**
+   * Get emails in mailbox (paginated)
+   */
+  static async getEmails(
+    mailboxId: string,
+    params?: IGetEmailsParams
+  ): Promise<
+    CustomAxiosResponse<ApiResponse<IPaginatedResponse<IEmailListItem>>>
+  > {
+    const queryParams = new URLSearchParams();
+    if (params?.page !== undefined) {
+      queryParams.append('page', params.page.toString());
+    }
+    if (params?.size !== undefined) {
+      queryParams.append('size', params.size.toString());
+    }
+
+    const queryString = queryParams.toString();
+    const baseUrl = MAILBOX_ENDPOINTS.GET_EMAILS(mailboxId);
+    const url = queryString ? `${baseUrl}?${queryString}` : baseUrl;
+
+    return await axiosBI.get(url);
+  }
+
+  /**
+   * Get email detail by ID
+   */
+  static async getEmailById(
+    emailId: string
+  ): Promise<CustomAxiosResponse<ApiResponse<IEmailDetail>>> {
+    return await axiosBI.get(EMAIL_ENDPOINTS.GET_BY_ID(emailId));
+  }
+
+  /**
+   * Perform bulk actions on emails
+   */
+  static async bulkAction(
+    params: IBulkEmailActionParams
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.post(EMAIL_ENDPOINTS.BULK_ACTION, params);
+  }
+
+  /**
+   * Mark email as read
+   */
+  static async markAsRead(
+    emailId: string
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.patch(EMAIL_ENDPOINTS.MARK_READ(emailId));
+  }
+
+  /**
+   * Mark email as unread
+   */
+  static async markAsUnread(
+    emailId: string
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.patch(EMAIL_ENDPOINTS.MARK_UNREAD(emailId));
+  }
+
+  /**
+   * Toggle star on email
+   */
+  static async toggleStar(
+    emailId: string,
+    starred: boolean
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.patch(
+      `${EMAIL_ENDPOINTS.TOGGLE_STAR(emailId)}?starred=${starred}`
+    );
+  }
+
+  /**
+   * Delete email
+   */
+  static async delete(
+    emailId: string
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.delete(EMAIL_ENDPOINTS.DELETE(emailId));
+  }
+}
+
+export default EmailService;
+
+//====================================================

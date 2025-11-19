@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 
 import { EmailLayout } from '@/components/email/email-layout';
 import { MockSidebar } from '@/mocks/sidebar';
@@ -8,12 +9,18 @@ import { mockEmails } from '@/mocks/emails';
 import { ParsedMessage } from '@/types';
 import { type Message } from '@/components/ui/chat-message';
 import { ChatDialog } from '@/components/chat/chat-dialog';
+import useAuth from '@/lib/stores/use-auth';
+import { ROUTES } from '@/utils/constants/routes';
 
 export default function MailFolderPage({
   params: _params,
 }: {
   params: { folder: string };
 }) {
+  const router = useRouter();
+  const logout = useAuth((state) => state.logout);
+  const user = useAuth((state) => state.user);
+
   //Init state hook
   const [emails, setEmails] = React.useState<ParsedMessage[]>(mockEmails);
   const [loading] = React.useState(false);
@@ -78,8 +85,15 @@ export default function MailFolderPage({
     // TODO: Implement compose email functionality
   };
 
-  const handleLogoutClick = () => {
-    // TODO: Implement logout functionality
+  const handleLogoutClick = async () => {
+    try {
+      await logout();
+      // Redirect to login page after logout
+      router.push(ROUTES.LOGIN);
+    } catch (error) {
+      // Even if logout API fails, redirect to login
+      router.push(ROUTES.LOGIN);
+    }
   };
 
   //Init chat handlers
@@ -165,6 +179,16 @@ export default function MailFolderPage({
       <EmailLayout
         sidebar={
           <MockSidebar
+            user={
+              user
+                ? {
+                    id: user.id,
+                    name: user.name,
+                    email: user.email,
+                    avatar: user.profilePicture || undefined,
+                  }
+                : undefined
+            }
             onItemClick={handleSidebarItemClick}
             onComposeClick={handleComposeClick}
             onLogoutClick={handleLogoutClick}

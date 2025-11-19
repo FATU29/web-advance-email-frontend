@@ -4,12 +4,25 @@ import axios, {
   InternalAxiosRequestConfig,
   AxiosError,
 } from 'axios';
+import { AUTH_ENDPOINTS } from '@/utils/constants/api';
 import { getRefreshToken, setTokens, removeTokens, getAuthHeader } from './jwt';
+import { API_BASE_URL } from '@/utils/constants/general';
 
 //==================== REGION TYPES ====================
 interface RefreshTokenResponse {
-  accessToken: string;
-  refreshToken: string;
+  success: boolean;
+  data: {
+    accessToken: string;
+    refreshToken: string;
+    tokenType: string;
+    expiresIn: number;
+    user: {
+      id: string;
+      email: string;
+      name: string;
+      profilePicture: string | null;
+    };
+  } | null;
 }
 
 interface PendingRequest {
@@ -19,7 +32,7 @@ interface PendingRequest {
 //====================================================
 
 //==================== REGION CONSTANTS ====================
-const REFRESH_TOKEN_ENDPOINT = '/auth/refresh'; // Update this to your refresh token endpoint
+const REFRESH_TOKEN_ENDPOINT = AUTH_ENDPOINTS.REFRESH;
 const LOGIN_PATH = '/login';
 //====================================================
 
@@ -63,7 +76,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
 
   // Create a new axios instance without interceptors to avoid infinite loop
   const refreshAxios = axios.create({
-    baseURL: process.env.NEXT_PUBLIC_API_BASE_URL || '',
+    baseURL: API_BASE_URL,
     timeout: 30000,
     headers: {
       'Content-Type': 'application/json',
@@ -78,12 +91,16 @@ const refreshAccessToken = async (): Promise<string | null> => {
       }
     );
 
-    const { accessToken, refreshToken: newRefreshToken } = response.data;
+    if (response.data.success && response.data.data) {
+      const { accessToken, refreshToken: newRefreshToken } = response.data.data;
 
-    // Update tokens in cookies
-    setTokens(accessToken, newRefreshToken);
+      // Update tokens in cookies
+      setTokens(accessToken, newRefreshToken);
 
-    return accessToken;
+      return accessToken;
+    }
+
+    return null;
   } catch (error) {
     // Refresh token expired (401) or other error -> redirect to login
     const axiosError = error as AxiosError;

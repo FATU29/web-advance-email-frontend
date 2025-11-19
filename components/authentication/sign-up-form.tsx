@@ -3,6 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -28,12 +29,16 @@ import {
 } from '@/components/ui/field';
 import { signupSchema, type SignupFormData } from '@/lib/validations/auth';
 import { getApiErrorMessages } from '@/utils/function';
-import { useState } from 'react';
+import useAuth from '@/lib/stores/use-auth';
+import { ROUTES } from '@/utils/constants/routes';
 import { AxiosError } from 'axios';
 
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [generalError, setGeneralError] = useState<string | null>(null);
+  const router = useRouter();
+  const signup = useAuth((state) => state.signup);
+  const isLoading = useAuth((state) => state.isLoading);
+  const error = useAuth((state) => state.error);
+  const clearError = useAuth((state) => state.clearError);
 
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
@@ -47,23 +52,21 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     },
   });
 
-  const onSubmit = async (_data: SignupFormData) => {
-    setIsLoading(true);
-    setGeneralError(null);
+  const onSubmit = async (data: SignupFormData) => {
+    clearError();
+    form.clearErrors();
 
     try {
-      // TODO: Implement signup API call
-      // const response = await signupApi(data);
-      // Handle success (e.g., redirect to verify OTP)
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // Remove confirmPassword before sending to API
+      const { confirmPassword, ...signupData } = data;
+      await signup(signupData);
+      // Redirect to mail page on success
+      router.push(ROUTES.MAIL);
     } catch (error) {
       const axiosError = error as AxiosError<{
         message?: string;
         errors?: Record<string, string[]>;
       }>;
-      const errorMessage = getApiErrorMessages(axiosError);
 
       // Handle field-specific errors
       if (axiosError.response?.data?.errors) {
@@ -77,13 +80,15 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
             });
           }
         });
-      } else {
-        // Handle general error
-        setGeneralError(errorMessage);
       }
-    } finally {
-      setIsLoading(false);
+      // General error is handled by store's error state
     }
+  };
+
+  const handleGoogleSignup = () => {
+    // TODO: Implement Google OAuth flow
+    // This should redirect to Google OAuth, then handle callback
+    // For now, this is a placeholder
   };
 
   return (
@@ -98,8 +103,8 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <FieldGroup>
-              {generalError && (
-                <FieldError className="text-center">{generalError}</FieldError>
+              {error && (
+                <FieldError className="text-center">{error}</FieldError>
               )}
               <FormField
                 control={form.control}
@@ -202,6 +207,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                     type="button"
                     className="w-full"
                     disabled={isLoading}
+                    onClick={handleGoogleSignup}
                   >
                     Sign up with Google
                   </Button>

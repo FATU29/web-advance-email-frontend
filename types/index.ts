@@ -10,9 +10,11 @@ export type Label = {
 };
 
 export interface User {
+  id: string;
   name: string;
   email: string;
-  avatar: string;
+  avatar?: string;
+  profilePicture?: string | null;
 }
 
 export interface ISendEmail {

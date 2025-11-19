@@ -1,5 +1,7 @@
 // JWT token management service
 
+import { decodeJwt } from 'jose';
+
 import { getCookie, setCookie, removeCookie } from '@/utils/helpers/cookie';
 
 //==================== REGION CONSTANTS ====================
@@ -90,4 +92,33 @@ export const isAuthenticated = (): boolean => {
 export const getAuthHeader = (): string | null => {
   const token = getAccessToken();
   return token ? `Bearer ${token}` : null;
+};
+
+/**
+ * Decode JWT token and return payload
+ * @param token - JWT token string
+ * @returns Decoded token payload or null if invalid
+ */
+export const decodeToken = <T = Record<string, unknown>>(
+  token: string
+): T | null => {
+  try {
+    const decoded = decodeJwt(token);
+    return decoded as T;
+  } catch (error) {
+    console.error('Failed to decode JWT token:', error);
+    return null;
+  }
+};
+
+/**
+ * Decode current access token and return payload
+ * @returns Decoded access token payload or null if not found/invalid
+ */
+export const decodeAccessToken = <T = Record<string, unknown>>(): T | null => {
+  const token = getAccessToken();
+  if (!token) {
+    return null;
+  }
+  return decodeToken<T>(token);
 };
