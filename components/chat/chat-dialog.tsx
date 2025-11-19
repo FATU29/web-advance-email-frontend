@@ -115,7 +115,7 @@ export function ChatDialog({
       </PopoverTrigger>
       <PopoverContent
         className={cn(
-          'p-0 gap-0 w-[420px] max-w-[calc(100vw-2rem)] rounded-lg border shadow-lg',
+          'p-0 gap-0 w-[500px] max-w-[calc(100vw-5rem)] rounded-lg border shadow-lg',
           'flex flex-col overflow-hidden',
           dialogClassName
         )}
