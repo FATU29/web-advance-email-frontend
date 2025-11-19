@@ -28,7 +28,6 @@ import {
   FieldError,
 } from '@/components/ui/field';
 import { signupSchema, type SignupFormData } from '@/lib/validations/auth';
-import { getApiErrorMessages } from '@/utils/function';
 import useAuth from '@/lib/stores/use-auth';
 import { ROUTES } from '@/utils/constants/routes';
 import { AxiosError } from 'axios';
