@@ -6,8 +6,8 @@ import { EmailLayout } from '@/components/email/email-layout';
 import { MockSidebar } from '@/mocks/sidebar';
 import { mockEmails } from '@/mocks/emails';
 import { ParsedMessage } from '@/types';
-import { ChatDialog } from '@/components/ui/chat-dialog';
 import { type Message } from '@/components/ui/chat-message';
+import { ChatDialog } from '@/components/chat/chat-dialog';
 
 export default function MailFolderPage({
   params: _params,
@@ -125,6 +125,40 @@ export default function MailFolderPage({
     // TODO: Implement stop generation
   };
 
+  const handleChatAppend = (message: { role: 'user'; content: string }) => {
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: message.role,
+      content: message.content,
+      createdAt: new Date(),
+    };
+
+    setChatMessages((prev) => [...prev, userMessage]);
+    setChatInput('');
+    setIsGenerating(true);
+
+    // TODO: Implement chat API call
+    // Simulate AI response
+    setTimeout(() => {
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content:
+          'This is a placeholder response. Please implement the chat API.',
+        createdAt: new Date(),
+      };
+      setChatMessages((prev) => [...prev, aiMessage]);
+      setIsGenerating(false);
+    }, 1000);
+  };
+
+  const chatSuggestions = [
+    'Summarize my emails',
+    'Find important emails',
+    'Draft a reply',
+    'Check my schedule',
+  ];
+
   //Render
   return (
     <div className="relative flex h-screen w-full flex-col">
@@ -163,6 +197,8 @@ export default function MailFolderPage({
           isGenerating={isGenerating}
           stop={handleChatStop}
           setMessages={setChatMessages}
+          append={handleChatAppend}
+          suggestions={chatSuggestions}
         />
       </div>
     </div>

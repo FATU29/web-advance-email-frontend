@@ -199,25 +199,29 @@ export function Chat({
   return (
     <ChatContainer className={className}>
       {isEmpty && append && suggestions ? (
-        <PromptSuggestions
-          label="Try these prompts ✨"
-          append={append}
-          suggestions={suggestions}
-        />
-      ) : null}
-
-      {messages.length > 0 ? (
-        <ChatMessages messages={messages}>
-          <MessageList
-            messages={messages}
-            isTyping={isTyping}
-            messageOptions={messageOptions}
+        <div className="flex justify-center py-6 h-[450px] flex-1 overflow-y-auto">
+          <PromptSuggestions
+            label="Try these prompts ✨"
+            append={append}
+            suggestions={suggestions}
           />
-        </ChatMessages>
-      ) : null}
+        </div>
+      ) : messages.length > 0 ? (
+        <div className="h-[450px] overflow-y-auto">
+          <ChatMessages messages={messages}>
+            <MessageList
+              messages={messages}
+              isTyping={isTyping}
+              messageOptions={messageOptions}
+            />
+          </ChatMessages>
+        </div>
+      ) : (
+        <div className="overflow-y-auto min-h-0 flex-1" />
+      )}
 
       <ChatForm
-        className="mt-auto"
+        className="pt-2 shrink-0"
         isPending={isGenerating || isTyping}
         handleSubmit={handleSubmit}
       >
@@ -255,7 +259,7 @@ export function ChatMessages({
 
   return (
     <div
-      className="grid grid-cols-1 overflow-y-auto pb-4"
+      className="grid grid-cols-1 overflow-y-auto overflow-x-hidden pb-4 pt-4 w-full max-w-full min-h-0 flex-1"
       ref={containerRef}
       onScroll={handleScroll}
       onTouchStart={handleTouchStart}
@@ -289,7 +293,12 @@ export const ChatContainer = forwardRef<
   return (
     <div
       ref={ref}
-      className={cn('grid max-h-full w-full grid-rows-[1fr_auto]', className)}
+      className={cn(
+        'grid w-full max-w-full grid-rows-[1fr_auto]',
+        'h-full min-h-0',
+        'overflow-hidden',
+        className
+      )}
       {...props}
     />
   );
@@ -310,7 +319,7 @@ interface ChatFormProps {
 }
 
 export const ChatForm = forwardRef<HTMLFormElement, ChatFormProps>(
-  ({ children, handleSubmit, isPending, className }, ref) => {
+  ({ children, handleSubmit, className }, ref) => {
     const [files, setFiles] = useState<File[] | null>(null);
 
     const onSubmit = (event: React.FormEvent) => {
