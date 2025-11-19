@@ -23,16 +23,27 @@ import {
   InputOTPGroup,
   InputOTPSlot,
 } from '@/components/ui/input-otp';
-import { Field, FieldDescription, FieldGroup } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldError,
+} from '@/components/ui/field';
 import { otpSchema, type OTPFormData } from '@/lib/validations/auth';
+import { getApiErrorMessages } from '@/utils/function';
 import { useState } from 'react';
+import { AxiosError } from 'axios';
 
 export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
   const [isLoading, setIsLoading] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [generalError, setGeneralError] = useState<string | null>(null);
+  const [resendError, setResendError] = useState<string | null>(null);
 
   const form = useForm<OTPFormData>({
     resolver: zodResolver(otpSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: {
       otp: '',
     },
@@ -40,12 +51,39 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
 
   const onSubmit = async (_data: OTPFormData) => {
     setIsLoading(true);
+    setGeneralError(null);
+
     try {
       // TODO: Implement OTP verification API call
+      // const response = await verifyOtpApi(_data);
+      // setTokens(response.data.accessToken, response.data.refreshToken);
+      // router.push('/mail');
+
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
     } catch (error) {
-      console.error('OTP verification error:', error);
+      const axiosError = error as AxiosError<{
+        message?: string;
+        errors?: Record<string, string[]>;
+      }>;
+      const errorMessage = getApiErrorMessages(axiosError);
+
+      // Handle field-specific errors
+      if (axiosError.response?.data?.errors) {
+        const fieldErrors = axiosError.response.data.errors;
+        Object.keys(fieldErrors).forEach((field) => {
+          const fieldName = field as keyof OTPFormData;
+          if (fieldErrors[field] && fieldErrors[field].length > 0) {
+            form.setError(fieldName, {
+              type: 'server',
+              message: fieldErrors[field][0],
+            });
+          }
+        });
+      } else {
+        // Handle general error
+        setGeneralError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -53,12 +91,17 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
 
   const handleResend = async () => {
     setIsResending(true);
+    setResendError(null);
+
     try {
       // TODO: Implement resend OTP API call
+      // await resendOtpApi();
+
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
     } catch (error) {
-      console.error('Resend OTP error:', error);
+      const axiosError = error as AxiosError;
+      setResendError(getApiErrorMessages(axiosError));
     } finally {
       setIsResending(false);
     }
@@ -74,6 +117,9 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <FieldGroup>
+              {generalError && (
+                <FieldError className="text-center">{generalError}</FieldError>
+              )}
               <FormField
                 control={form.control}
                 name="otp"
@@ -117,6 +163,11 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
                     {isResending ? 'Resending...' : 'Resend'}
                   </button>
                 </FieldDescription>
+                {resendError && (
+                  <FieldError className="text-center text-sm">
+                    {resendError}
+                  </FieldError>
+                )}
               </FieldGroup>
             </FieldGroup>
           </form>

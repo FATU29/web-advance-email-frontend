@@ -20,18 +20,28 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Field, FieldDescription, FieldGroup } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldError,
+} from '@/components/ui/field';
 import { loginSchema, type LoginFormData } from '@/lib/validations/auth';
+import { getApiErrorMessages } from '@/utils/function';
 import { useState } from 'react';
+import { AxiosError } from 'axios';
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<'div'>) {
   const [isLoading, setIsLoading] = useState(false);
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: {
       email: '',
       password: '',
@@ -40,12 +50,41 @@ export function LoginForm({
 
   const onSubmit = async (_data: LoginFormData) => {
     setIsLoading(true);
+    setGeneralError(null);
+
     try {
       // TODO: Implement login API call
+      // const response = await loginApi(data);
+      // setTokens(response.data.accessToken, response.data.refreshToken);
+
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // On success, redirect or handle success
+      // router.push('/mail');
     } catch (error) {
-      console.error('Login error:', error);
+      const axiosError = error as AxiosError<{
+        message?: string;
+        errors?: Record<string, string[]>;
+      }>;
+      const errorMessage = getApiErrorMessages(axiosError);
+
+      // Handle field-specific errors
+      if (axiosError.response?.data?.errors) {
+        const fieldErrors = axiosError.response.data.errors;
+        Object.keys(fieldErrors).forEach((field) => {
+          const fieldName = field as keyof LoginFormData;
+          if (fieldErrors[field] && fieldErrors[field].length > 0) {
+            form.setError(fieldName, {
+              type: 'server',
+              message: fieldErrors[field][0],
+            });
+          }
+        });
+      } else {
+        // Handle general error
+        setGeneralError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -64,6 +103,11 @@ export function LoginForm({
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
               <FieldGroup>
+                {generalError && (
+                  <FieldError className="text-center">
+                    {generalError}
+                  </FieldError>
+                )}
                 <FormField
                   control={form.control}
                   name="email"
@@ -73,7 +117,6 @@ export function LoginForm({
                         <FormLabel>Email</FormLabel>
                         <FormControl>
                           <Input
-                            type="email"
                             placeholder="m@example.com"
                             disabled={isLoading}
                             {...field}

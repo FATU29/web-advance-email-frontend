@@ -20,15 +20,25 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { Field, FieldDescription, FieldGroup } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldError,
+} from '@/components/ui/field';
 import { signupSchema, type SignupFormData } from '@/lib/validations/auth';
+import { getApiErrorMessages } from '@/utils/function';
 import { useState } from 'react';
+import { AxiosError } from 'axios';
 
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   const [isLoading, setIsLoading] = useState(false);
+  const [generalError, setGeneralError] = useState<string | null>(null);
 
   const form = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
     defaultValues: {
       name: '',
       email: '',
@@ -39,12 +49,38 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 
   const onSubmit = async (_data: SignupFormData) => {
     setIsLoading(true);
+    setGeneralError(null);
+
     try {
       // TODO: Implement signup API call
+      // const response = await signupApi(data);
+      // Handle success (e.g., redirect to verify OTP)
+
       // Simulate API call
       await new Promise((resolve) => setTimeout(resolve, 1000));
     } catch (error) {
-      console.error('Signup error:', error);
+      const axiosError = error as AxiosError<{
+        message?: string;
+        errors?: Record<string, string[]>;
+      }>;
+      const errorMessage = getApiErrorMessages(axiosError);
+
+      // Handle field-specific errors
+      if (axiosError.response?.data?.errors) {
+        const fieldErrors = axiosError.response.data.errors;
+        Object.keys(fieldErrors).forEach((field) => {
+          const fieldName = field as keyof SignupFormData;
+          if (fieldErrors[field] && fieldErrors[field].length > 0) {
+            form.setError(fieldName, {
+              type: 'server',
+              message: fieldErrors[field][0],
+            });
+          }
+        });
+      } else {
+        // Handle general error
+        setGeneralError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -62,6 +98,9 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <FieldGroup>
+              {generalError && (
+                <FieldError className="text-center">{generalError}</FieldError>
+              )}
               <FormField
                 control={form.control}
                 name="name"
@@ -92,7 +131,6 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                       <FormLabel>Email</FormLabel>
                       <FormControl>
                         <Input
-                          type="email"
                           placeholder="m@example.com"
                           disabled={isLoading}
                           {...field}
