@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Ignore Zero folder
+    "Zero/**",
+    "Zero",
   ]),
   {
     rules: {
