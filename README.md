@@ -120,10 +120,16 @@ Or create `.env.local` manually with the following variables:
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000/api
 NEXT_PUBLIC_INTERNAL_API_BASE_URL=http://localhost:8000/api/internal
 
+# Google OAuth Configuration (if using Google Sign-In)
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id-here
+
 # Optional: Add other environment variables as needed
 ```
 
-**Note**: Replace the API URLs with your actual backend API endpoints.
+**Note**:
+
+- Replace the API URLs with your actual backend API endpoints
+- For Google OAuth, you'll need to set up a Google OAuth client ID (see Third-Party Services section)
 
 ### 4. Run the Development Server
 
@@ -134,6 +140,14 @@ npm run dev
 The application will be available at [http://localhost:3000](http://localhost:3000)
 
 Open your browser and navigate to the URL to see the application.
+
+### 5. Verify Installation
+
+After starting the development server, you should see:
+
+- The application loads without errors
+- You can navigate to the login page
+- The development server is running on port 3000 (or your specified port)
 
 ## 📜 Available Scripts
 
@@ -204,11 +218,153 @@ web-advance-email-frontend/
 └── middleware.ts          # Next.js middleware (currently disabled)
 ```
 
+## 🌐 Public Hosting & Deployment
+
+### Public URL
+
+**Production URL**: [https://your-app.vercel.app](https://your-app.vercel.app) _(Update with your actual deployment URL)_
+
+### Deploying to Production
+
+This application is optimized for deployment on **Vercel** (recommended) or any platform that supports Next.js.
+
+#### Option 1: Deploy to Vercel (Recommended)
+
+1. **Push your code to GitHub/GitLab/Bitbucket**
+
+2. **Import project to Vercel**:
+   - Go to [vercel.com](https://vercel.com)
+   - Click "New Project"
+   - Import your repository
+   - Vercel will auto-detect Next.js settings
+
+3. **Configure Environment Variables**:
+   - In Vercel project settings, add all environment variables from `.env.local`:
+     - `NEXT_PUBLIC_API_BASE_URL`
+     - `NEXT_PUBLIC_INTERNAL_API_BASE_URL`
+     - `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (if using Google OAuth)
+   - Set production API URLs (not localhost)
+
+4. **Deploy**:
+   - Vercel will automatically deploy on every push to main branch
+   - Or click "Deploy" to deploy immediately
+
+5. **Verify Deployment**:
+   - Visit your Vercel deployment URL
+   - Test authentication and API connections
+
+#### Option 2: Deploy Locally (Production Build)
+
+To test a production build locally:
+
+```bash
+# Build the application
+npm run build
+
+# Start production server
+npm run start
+```
+
+The production server will run on [http://localhost:3000](http://localhost:3000)
+
+**Note**: Make sure to set production environment variables before building.
+
+#### Option 3: Deploy to Other Platforms
+
+For other hosting providers (Netlify, AWS, DigitalOcean, etc.):
+
+1. Build the application: `npm run build`
+2. Set environment variables in your hosting platform
+3. Configure the platform to run `npm run start`
+4. Ensure Node.js 18+ is available
+
+### Environment Variables for Production
+
+When deploying, ensure these environment variables are set in your hosting platform:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=https://your-api-domain.com/api
+NEXT_PUBLIC_INTERNAL_API_BASE_URL=https://your-api-domain.com/api/internal
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-production-google-client-id
+```
+
+## 🔐 Token Storage & Security Considerations
+
+### Token Storage Implementation
+
+This application stores JWT tokens in **browser cookies** (not localStorage or sessionStorage) for the following reasons:
+
+#### Current Implementation
+
+- **Storage Method**: Browser cookies (client-side accessible)
+- **Access Token**: Stored in `access_token` cookie (7 days expiry)
+- **Refresh Token**: Stored in `refresh_token` cookie (30 days expiry)
+- **Cookie Settings**:
+  - `secure`: Enabled in production (HTTPS only)
+  - `sameSite`: `lax` (CSRF protection)
+  - `path`: `/` (available site-wide)
+
+#### Security Features
+
+1. **Secure Flag**: Cookies are only sent over HTTPS in production
+2. **SameSite Protection**: Prevents CSRF attacks by restricting cross-site requests
+3. **Automatic Token Refresh**: Access tokens are automatically refreshed when expired
+4. **Token Validation**: Tokens are validated on the client-side before use
+5. **Automatic Cleanup**: Tokens are removed on logout
+
+#### Security Considerations
+
+**Current Approach (Client-Side Cookies)**:
+
+- ✅ Tokens are accessible to JavaScript (needed for client-side token management)
+- ✅ Automatic token refresh works seamlessly
+- ✅ Works with client-side routing
+- ⚠️ Tokens are accessible via `document.cookie` (XSS risk if not properly sanitized)
+- ⚠️ Not HTTP-only (can be accessed by JavaScript)
+
+**Alternative Approach (HTTP-Only Cookies)**:
+For enhanced security, consider migrating to HTTP-only cookies:
+
+- ✅ Not accessible to JavaScript (XSS protection)
+- ✅ Automatically sent with requests
+- ⚠️ Requires server-side token management
+- ⚠️ More complex refresh token flow
+- ⚠️ Requires API endpoints to set cookies
+
+#### Recommendations
+
+1. **XSS Protection**:
+   - Always sanitize user input
+   - Use Content Security Policy (CSP) headers
+   - Avoid `dangerouslySetInnerHTML` with user content
+
+2. **HTTPS Only**:
+   - Always use HTTPS in production
+   - The `secure` flag ensures cookies only work over HTTPS
+
+3. **Token Expiry**:
+   - Access tokens expire after 7 days
+   - Refresh tokens expire after 30 days
+   - Consider shorter expiry times for sensitive applications
+
+4. **Future Improvements**:
+   - Consider migrating to HTTP-only cookies for production
+   - Implement token rotation for refresh tokens
+   - Add token revocation mechanism
+
+### Code Location
+
+Token storage implementation can be found in:
+
+- `services/jwt.ts` - Token management functions
+- `utils/helpers/cookie.ts` - Cookie utility functions
+- `services/axios.bi.ts` - Token refresh interceptor
+
 ## 🔐 Authentication Flow
 
 1. **Registration/Login**: Users can sign up or log in with email/password or Google OAuth
 2. **OTP Verification**: New users must verify their email with OTP
-3. **Token Management**: JWT tokens are stored in HTTP-only cookies
+3. **Token Management**: JWT tokens are stored in browser cookies with security flags
 4. **Auto Refresh**: Access tokens are automatically refreshed when expired
 5. **Route Protection**: Client-side route guards protect authenticated routes
 
@@ -256,6 +412,115 @@ If you encounter build errors:
 2. Clear node_modules: `rm -rf node_modules`
 3. Reinstall dependencies: `npm install`
 4. Rebuild: `npm run build`
+
+## 🔌 Third-Party Services
+
+This application integrates with the following third-party services:
+
+### 1. Google OAuth (Authentication)
+
+**Purpose**: Allow users to sign in with their Google account
+
+**Setup Instructions**:
+
+1. **Create Google OAuth Credentials**:
+   - Go to [Google Cloud Console](https://console.cloud.google.com/)
+   - Create a new project or select an existing one
+   - Enable "Google+ API" or "Google Identity Services"
+   - Go to "Credentials" → "Create Credentials" → "OAuth client ID"
+   - Choose "Web application"
+   - Add authorized JavaScript origins:
+     - `http://localhost:3000` (for development)
+     - `https://your-production-domain.com` (for production)
+   - Add authorized redirect URIs:
+     - `http://localhost:3000/api/auth/google/callback` (for development)
+     - `https://your-production-domain.com/api/auth/google/callback` (for production)
+
+2. **Get Client ID**:
+   - Copy the Client ID from Google Cloud Console
+   - Add it to your `.env.local` file:
+     ```env
+     NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-client-id-here
+     ```
+
+3. **Backend Configuration**:
+   - Ensure your backend API handles Google OAuth callback
+   - Backend should exchange the authorization code for tokens
+   - Backend should return JWT tokens in the same format as email/password login
+
+**Current Status**:
+
+- Google OAuth service methods are implemented in `services/auth.service.ts`
+- UI components have placeholder buttons for Google sign-in
+- Full OAuth flow integration is pending backend implementation
+
+**Documentation**:
+
+- [Google OAuth 2.0 Documentation](https://developers.google.com/identity/protocols/oauth2)
+- [Google Identity Services](https://developers.google.com/identity/gsi/web)
+
+### 2. Hosting Provider (Vercel - Recommended)
+
+**Purpose**: Host and deploy the Next.js application
+
+**Why Vercel**:
+
+- Built by the creators of Next.js
+- Zero-configuration deployment
+- Automatic HTTPS
+- Global CDN
+- Serverless functions support
+- Environment variables management
+- Automatic deployments from Git
+
+**Alternative Hosting Options**:
+
+- **Netlify**: Similar to Vercel, good Next.js support
+- **AWS Amplify**: AWS-based hosting with CI/CD
+- **DigitalOcean App Platform**: Simple PaaS solution
+- **Self-hosted**: Docker container on any VPS
+
+**Vercel Setup**:
+
+1. Sign up at [vercel.com](https://vercel.com)
+2. Connect your Git repository
+3. Configure environment variables
+4. Deploy automatically on every push
+
+**Documentation**:
+
+- [Vercel Documentation](https://vercel.com/docs)
+- [Next.js Deployment Guide](https://nextjs.org/docs/deployment)
+
+### 3. Backend API
+
+**Purpose**: Provides authentication, email management, and AI features
+
+**Configuration**:
+
+- Set `NEXT_PUBLIC_API_BASE_URL` to your backend API URL
+- Backend should support CORS for your frontend domain
+- Backend should handle JWT token validation
+- Backend should provide refresh token endpoint
+
+**API Endpoints Used**:
+
+- `/api/auth/login` - User login
+- `/api/auth/signup` - User registration
+- `/api/auth/google` - Google OAuth
+- `/api/auth/refresh` - Token refresh
+- `/api/auth/logout` - User logout
+- `/api/auth/me` - Get current user
+- `/api/mailboxes` - Get mailboxes
+- `/api/emails` - Email operations
+
+### Service Dependencies Summary
+
+| Service        | Purpose               | Required    | Status      |
+| -------------- | --------------------- | ----------- | ----------- |
+| Backend API    | Authentication & Data | ✅ Yes      | Required    |
+| Google OAuth   | Social Login          | ⚠️ Optional | Pending     |
+| Vercel/Hosting | Deployment            | ✅ Yes      | Recommended |
 
 ## 📝 Code Conventions
 
