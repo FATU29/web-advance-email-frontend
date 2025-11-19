@@ -7,6 +7,8 @@ import {
   IGoogleAuthParams,
   IRefreshTokenParams,
   ILogoutParams,
+  IIntrospectParams,
+  IIntrospectResponse,
   IAuthResponse,
   IAuthUser,
 } from '@/types/api.types';
@@ -71,6 +73,15 @@ class AuthService {
     params: ILogoutParams
   ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
     return await axiosBI.post(AUTH_ENDPOINTS.LOGOUT, params);
+  }
+
+  /**
+   * Introspect token - Check if token is valid
+   */
+  static async introspect(
+    params: IIntrospectParams
+  ): Promise<CustomAxiosResponse<ApiResponse<IIntrospectResponse>>> {
+    return await axiosBI.post(AUTH_ENDPOINTS.INTROSPECT, params);
   }
 }
 

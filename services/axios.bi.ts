@@ -5,6 +5,7 @@ import axios, {
   AxiosError,
 } from 'axios';
 import { AUTH_ENDPOINTS } from '@/utils/constants/api';
+import { ROUTES } from '@/utils/constants/routes';
 import { getRefreshToken, setTokens, removeTokens, getAuthHeader } from './jwt';
 import { API_BASE_URL } from '@/utils/constants/general';
 
@@ -33,7 +34,6 @@ interface PendingRequest {
 
 //==================== REGION CONSTANTS ====================
 const REFRESH_TOKEN_ENDPOINT = AUTH_ENDPOINTS.REFRESH;
-const LOGIN_PATH = '/login';
 //====================================================
 
 // Flag to prevent multiple refresh token requests
@@ -61,7 +61,7 @@ const redirectToLogin = () => {
   if (typeof window !== 'undefined') {
     // Clear tokens before redirect
     removeTokens();
-    window.location.href = LOGIN_PATH;
+    window.location.href = ROUTES.LOGIN;
   }
 };
 

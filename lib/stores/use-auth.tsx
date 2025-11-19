@@ -1,4 +1,10 @@
-import { login, signup, googleSignIn, logout as logoutApi } from '@/api/auth';
+import {
+  login,
+  signup,
+  googleSignIn,
+  logout as logoutApi,
+  introspect,
+} from '@/api/auth';
 import AuthService from '@/services/auth.service';
 import {
   getAccessToken,
@@ -208,19 +214,32 @@ const useAuth = create<AuthStore>()(
             return;
           }
 
-          // Kiểm tra token có hợp lệ không
+          // Kiểm tra token có hợp lệ không (local check)
           const decoded = decodeAccessToken();
           if (!decoded) {
+            removeTokens();
             set({ user: null, isLoading: false });
             return;
           }
 
-          // Gọi API để lấy thông tin user mới nhất từ server
+          // Gọi API introspect để kiểm tra token hợp lệ trên server
           try {
-            const response = await AuthService.getCurrentUser();
-            if (response.data.success && response.data.data) {
+            const introspectResponse = await introspect({ token: accessToken });
+            if (
+              !introspectResponse.data.success ||
+              !introspectResponse.data.data?.isValid
+            ) {
+              // Token không hợp lệ trên server, xóa token và user
+              removeTokens();
+              set({ user: null, isLoading: false });
+              return;
+            }
+
+            // Token hợp lệ, lấy thông tin user mới nhất từ server
+            const userResponse = await AuthService.getCurrentUser();
+            if (userResponse.data.success && userResponse.data.data) {
               set({
-                user: response.data.data,
+                user: userResponse.data.data,
                 isLoading: false,
                 error: null,
               });

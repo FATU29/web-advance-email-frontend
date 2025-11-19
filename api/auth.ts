@@ -8,6 +8,7 @@ export const login = AuthService.login;
 export const googleSignIn = AuthService.googleSignIn;
 export const refreshToken = AuthService.refreshToken;
 export const logout = AuthService.logout;
+export const introspect = AuthService.introspect;
 
 // Export service class
 export { AuthService };

@@ -2,7 +2,6 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -21,15 +20,11 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldError,
-} from '@/components/ui/field';
+import { Field, FieldGroup, FieldError } from '@/components/ui/field';
 import { signupSchema, type SignupFormData } from '@/lib/validations/auth';
 import useAuth from '@/lib/stores/use-auth';
 import { ROUTES } from '@/utils/constants/routes';
+import { getGoogleAuthUrl } from '@/utils/helpers/google-auth';
 import { AxiosError } from 'axios';
 
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
@@ -57,7 +52,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 
     try {
       // Remove confirmPassword before sending to API
-      const { confirmPassword, ...signupData } = data;
+      const { confirmPassword: _confirmPassword, ...signupData } = data;
       await signup(signupData);
       // Redirect to mail page on success
       router.push(ROUTES.MAIL);
@@ -85,9 +80,19 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   };
 
   const handleGoogleSignup = () => {
-    // TODO: Implement Google OAuth flow
-    // This should redirect to Google OAuth, then handle callback
-    // For now, this is a placeholder
+    try {
+      const googleAuthUrl = getGoogleAuthUrl();
+      window.location.href = googleAuthUrl;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Failed to initiate Google sign-in';
+      form.setError('root', {
+        type: 'manual',
+        message: errorMessage,
+      });
+    }
   };
 
   return (
@@ -140,10 +145,6 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                           {...field}
                         />
                       </FormControl>
-                      <FieldDescription>
-                        We&apos;ll use this to contact you. We will not share
-                        your email with anyone else.
-                      </FieldDescription>
                       <FormMessage />
                     </Field>
                   </FormItem>
@@ -165,10 +166,6 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                           {...field}
                         />
                       </FormControl>
-                      <FieldDescription>
-                        Must be at least 8 characters with uppercase, lowercase,
-                        and number.
-                      </FieldDescription>
                       <FormMessage />
                     </Field>
                   </FormItem>
@@ -210,15 +207,6 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                   >
                     Sign up with Google
                   </Button>
-                  <FieldDescription className="px-6 text-center">
-                    Already have an account?{' '}
-                    <Link
-                      href="/login"
-                      className="underline-offset-4 hover:underline"
-                    >
-                      Sign in
-                    </Link>
-                  </FieldDescription>
                 </Field>
               </FieldGroup>
             </FieldGroup>

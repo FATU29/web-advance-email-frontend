@@ -1,5 +1,9 @@
 # Email AI - Advanced Email Frontend
 
+**G03 - React Authentication (Email+Password + Google Sign-In) + Email Dashboard Mockup**
+
+📺 [Video Tutorial](https://www.youtube.com/watch?v=1_uFQTqI6d4)
+
 A modern, feature-rich email management application built with Next.js, React, and TypeScript. This application provides an intuitive interface for managing emails with AI-powered features.
 
 ## 📸 Screenshots

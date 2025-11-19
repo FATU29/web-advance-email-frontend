@@ -8,6 +8,7 @@ export const AUTH_ENDPOINTS = {
   REFRESH: '/api/auth/refresh',
   LOGOUT: '/api/auth/logout',
   ME: '/api/auth/me',
+  INTROSPECT: '/api/auth/introspect',
 } as const;
 
 // Mailbox endpoints

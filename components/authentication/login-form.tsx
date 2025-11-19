@@ -30,6 +30,7 @@ import {
 import { loginSchema, type LoginFormData } from '@/lib/validations/auth';
 import useAuth from '@/lib/stores/use-auth';
 import { ROUTES } from '@/utils/constants/routes';
+import { getGoogleAuthUrl } from '@/utils/helpers/google-auth';
 import { AxiosError } from 'axios';
 
 export function LoginForm({
@@ -86,9 +87,19 @@ export function LoginForm({
   };
 
   const handleGoogleLogin = () => {
-    // TODO: Implement Google OAuth flow
-    // This should redirect to Google OAuth, then handle callback
-    // For now, this is a placeholder
+    try {
+      const googleAuthUrl = getGoogleAuthUrl();
+      window.location.href = googleAuthUrl;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : 'Failed to initiate Google sign-in';
+      form.setError('root', {
+        type: 'manual',
+        message: errorMessage,
+      });
+    }
   };
 
   return (

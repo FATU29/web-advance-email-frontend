@@ -31,6 +31,14 @@ export interface ILogoutParams {
   refreshToken: string;
 }
 
+export interface IIntrospectParams {
+  token: string;
+}
+
+export interface IIntrospectResponse {
+  isValid: boolean;
+}
+
 export interface IAuthUser {
   id: string;
   email: string;
