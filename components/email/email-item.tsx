@@ -2,20 +2,20 @@
 
 import * as React from 'react';
 import { format, formatDistanceToNow } from 'date-fns';
-import { Paperclip } from 'lucide-react';
+import { Paperclip, Star } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import { ParsedMessage } from '@/types';
+import { IEmailListItem } from '@/types/api.types';
 
 export interface EmailItemProps {
-  email: ParsedMessage;
+  email: IEmailListItem;
   isSelected?: boolean;
   onSelect?: (emailId: string, selected: boolean) => void;
-  onClick?: (email: ParsedMessage) => void;
+  onClick?: (email: IEmailListItem) => void;
   isCompact?: boolean;
 }
 
@@ -50,6 +50,33 @@ export function EmailItem({
     return '?';
   };
 
+  // Generate consistent random color based on email/name
+  const getAvatarColor = (name?: string, email?: string) => {
+    const str = name || email || 'default';
+    const colors = [
+      'bg-blue-500',
+      'bg-green-500',
+      'bg-purple-500',
+      'bg-pink-500',
+      'bg-indigo-500',
+      'bg-yellow-500',
+      'bg-red-500',
+      'bg-teal-500',
+      'bg-orange-500',
+      'bg-cyan-500',
+    ];
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
+  // Extract sender name and email from API format
+  const senderName = email.fromName || email.from.split('@')[0];
+  const senderEmail = email.from;
+
   const formatDate = (dateString: string) => {
     try {
       const date = new Date(dateString);
@@ -68,7 +95,8 @@ export function EmailItem({
     }
   };
 
-  const hasAttachments = email.attachments && email.attachments.length > 0;
+  // Check if email is unread
+  const isUnread = email.isRead === false;
 
   //Render
   return (
@@ -77,7 +105,7 @@ export function EmailItem({
         'group relative cursor-pointer rounded-none border-x-0 border-t-0 transition-colors',
         'hover:bg-accent/50',
         isSelected && 'bg-accent',
-        !email.unread && 'bg-muted/30'
+        isUnread && 'bg-primary/5 border-l-4 border-l-primary'
       )}
       onClick={handleClick}
     >
@@ -93,18 +121,23 @@ export function EmailItem({
               onCheckedChange={handleCheckboxChange}
               className="opacity-0 group-hover:opacity-100 data-[state=checked]:opacity-100 transition-opacity"
             />
-            {/* Unread indicator - next to checkbox */}
-            {email.unread && (
-              <div className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-primary" />
+            {/* Unread indicator - only show when email is unread */}
+            {isUnread && (
+              <div className="absolute -left-1.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-primary ring-2 ring-background" />
             )}
           </div>
 
           {/* Avatar */}
           {!isCompact && (
             <Avatar className="size-8 shrink-0 md:size-10">
-              <AvatarImage src={email.sender.email} alt={email.sender.name} />
-              <AvatarFallback className="bg-primary/10 text-primary text-xs md:text-sm">
-                {getInitials(email.sender.name, email.sender.email)}
+              <AvatarImage src={senderEmail} alt={senderName} />
+              <AvatarFallback
+                className={cn(
+                  'text-white text-xs md:text-sm font-semibold',
+                  getAvatarColor(senderName, senderEmail)
+                )}
+              >
+                {getInitials(senderName, senderEmail)}
               </AvatarFallback>
             </Avatar>
           )}
@@ -118,45 +151,25 @@ export function EmailItem({
                 <span
                   className={cn(
                     'truncate text-xs md:text-sm font-medium',
-                    email.unread ? 'text-foreground' : 'text-muted-foreground'
+                    isUnread
+                      ? 'font-semibold text-foreground'
+                      : 'font-normal text-muted-foreground'
                   )}
                 >
-                  {email.sender.name || email.sender.email}
+                  {senderName || senderEmail}
                 </span>
 
-                {/* Labels/Tags */}
-                {email.tags && email.tags.length > 0 && (
-                  <div className="hidden sm:flex items-center gap-1">
-                    {email.tags.slice(0, 2).map((tag) => (
-                      <Badge
-                        key={tag.id}
-                        variant="secondary"
-                        className="text-xs"
-                        style={
-                          tag.color
-                            ? {
-                                backgroundColor: tag.color.backgroundColor,
-                                color: tag.color.textColor,
-                                borderColor: tag.color.backgroundColor,
-                              }
-                            : undefined
-                        }
-                      >
-                        {tag.name}
-                      </Badge>
-                    ))}
-                    {email.tags.length > 2 && (
-                      <Badge variant="outline" className="text-xs">
-                        +{email.tags.length - 2}
-                      </Badge>
-                    )}
-                  </div>
+                {/* Important indicator */}
+                {email.isImportant && (
+                  <Badge variant="secondary" className="text-xs">
+                    Important
+                  </Badge>
                 )}
               </div>
 
               {/* Date */}
               <span className="shrink-0 text-xs text-muted-foreground">
-                {formatDate(email.receivedOn)}
+                {formatDate(email.receivedAt)}
               </span>
             </div>
 
@@ -165,8 +178,8 @@ export function EmailItem({
               <span
                 className={cn(
                   'truncate text-xs md:text-sm',
-                  email.unread
-                    ? 'font-semibold text-foreground'
+                  isUnread
+                    ? 'font-bold text-foreground'
                     : 'font-normal text-muted-foreground'
                 )}
               >
@@ -175,22 +188,19 @@ export function EmailItem({
 
               {/* Indicators */}
               <div className="flex items-center gap-1">
-                {hasAttachments && (
+                {email.hasAttachments && (
                   <Paperclip className="size-3 shrink-0 text-muted-foreground md:size-3.5" />
                 )}
-                {email.isDraft && (
-                  <Badge variant="outline" className="text-xs">
-                    Draft
-                  </Badge>
+                {email.isStarred && (
+                  <Star className="size-3 shrink-0 text-yellow-500 fill-yellow-500 md:size-3.5" />
                 )}
               </div>
             </div>
 
             {/* Preview */}
-            {!isCompact && email.body && (
+            {!isCompact && email.preview && (
               <p className="line-clamp-1 text-xs text-muted-foreground">
-                {email.body.replace(/<[^>]*>/g, '').trim() ||
-                  'No preview available'}
+                {email.preview || 'No preview available'}
               </p>
             )}
           </div>

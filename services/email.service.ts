@@ -7,6 +7,9 @@ import {
   IPaginatedResponse,
   IGetEmailsParams,
   IBulkEmailActionParams,
+  ISendEmailParams,
+  IReplyEmailParams,
+  IModifyEmailParams,
 } from '@/types/api.types';
 import { EMAIL_ENDPOINTS, MAILBOX_ENDPOINTS } from '@/utils/constants/api';
 
@@ -96,6 +99,35 @@ class EmailService {
     emailId: string
   ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
     return await axiosBI.delete(EMAIL_ENDPOINTS.DELETE(emailId));
+  }
+
+  /**
+   * Send email
+   */
+  static async send(
+    params: ISendEmailParams
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.post(EMAIL_ENDPOINTS.SEND, params);
+  }
+
+  /**
+   * Reply to email
+   */
+  static async reply(
+    emailId: string,
+    params: IReplyEmailParams
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.post(EMAIL_ENDPOINTS.REPLY(emailId), params);
+  }
+
+  /**
+   * Modify email (alternative bulk action endpoint)
+   */
+  static async modify(
+    emailId: string,
+    params: IModifyEmailParams
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.post(EMAIL_ENDPOINTS.MODIFY(emailId), params);
   }
 }
 

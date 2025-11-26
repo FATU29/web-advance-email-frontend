@@ -28,7 +28,7 @@ export interface IRefreshTokenParams {
 }
 
 export interface ILogoutParams {
-  refreshToken: string;
+  refreshToken?: string;
 }
 
 export interface IIntrospectParams {
@@ -37,6 +37,31 @@ export interface IIntrospectParams {
 
 export interface IIntrospectResponse {
   isValid: boolean;
+}
+
+export interface IVerifyEmailParams {
+  email: string;
+  code: string;
+}
+
+export interface IResendVerificationOtpParams {
+  email: string;
+}
+
+export interface IForgotPasswordParams {
+  email: string;
+}
+
+export interface IResetPasswordParams {
+  email: string;
+  code: string;
+  newPassword: string;
+}
+
+export interface IChangePasswordParams {
+  currentPassword: string;
+  newPassword: string;
+  code: string;
 }
 
 export interface IAuthUser {
@@ -66,10 +91,12 @@ export interface IAuthResponse {
 export type MailboxType =
   | 'INBOX'
   | 'SENT'
-  | 'DRAFT'
+  | 'DRAFTS'
   | 'TRASH'
   | 'SPAM'
-  | 'ARCHIVE';
+  | 'STARRED'
+  | 'IMPORTANT'
+  | 'CUSTOM';
 
 export interface IMailbox {
   id: string;
@@ -143,6 +170,26 @@ export type EmailAction =
   | 'archive';
 
 export interface IBulkEmailActionParams {
+  emailIds: string[];
+  action: EmailAction;
+}
+
+export interface ISendEmailParams {
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body: string;
+  attachmentIds?: string[];
+}
+
+export interface IReplyEmailParams {
+  body: string;
+  replyAll?: boolean;
+  attachmentIds?: string[];
+}
+
+export interface IModifyEmailParams {
   emailIds: string[];
   action: EmailAction;
 }

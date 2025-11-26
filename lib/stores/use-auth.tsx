@@ -4,6 +4,12 @@ import {
   googleSignIn,
   logout as logoutApi,
   introspect,
+  verifyEmail,
+  resendVerificationOtp,
+  forgotPassword,
+  resetPassword,
+  sendChangePasswordOtp,
+  changePassword,
 } from '@/api/auth';
 import AuthService from '@/services/auth.service';
 import {
@@ -18,6 +24,11 @@ import {
   IUserLoginParams,
   IUserSignupParams,
   IGoogleAuthParams,
+  IVerifyEmailParams,
+  IResendVerificationOtpParams,
+  IForgotPasswordParams,
+  IResetPasswordParams,
+  IChangePasswordParams,
 } from '@/types/api.types';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -28,16 +39,26 @@ interface AuthState {
   user: IAuthUser | null;
   isLoading: boolean;
   error: string | null;
+  pendingVerificationEmail: string | null; // Email that needs OTP verification
 }
 
 interface AuthActions {
   login: (params: IUserLoginParams) => Promise<void>;
   signup: (params: IUserSignupParams) => Promise<void>;
+  verifyEmail: (params: IVerifyEmailParams) => Promise<void>;
+  resendVerificationOtp: (
+    params: IResendVerificationOtpParams
+  ) => Promise<void>;
   googleSignIn: (params: IGoogleAuthParams) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   clearError: () => void;
   initializeAuth: () => Promise<void>;
+  forgotPassword: (params: IForgotPasswordParams) => Promise<void>;
+  resetPassword: (params: IResetPasswordParams) => Promise<void>;
+  sendChangePasswordOtp: () => Promise<void>;
+  changePassword: (params: IChangePasswordParams) => Promise<void>;
+  setPendingVerificationEmail: (email: string | null) => void;
   // Computed getter - không lưu trong state để tránh hack
   getIsAuthenticated: () => boolean;
 }
@@ -52,6 +73,7 @@ const useAuth = create<AuthStore>()(
       user: null,
       isLoading: false,
       error: null,
+      pendingVerificationEmail: null,
 
       // Computed getter - kiểm tra token thực tế, không lưu trong state
       getIsAuthenticated: () => {
@@ -102,11 +124,11 @@ const useAuth = create<AuthStore>()(
         set({ isLoading: true, error: null });
         try {
           const response = await signup(params);
-          if (response.data.success && response.data.data) {
-            const { accessToken, refreshToken, user } = response.data.data;
-            setTokens(accessToken, refreshToken);
+          if (response.data.success) {
+            // Signup successful, but user needs to verify email
+            // Store email for OTP verification
             set({
-              user,
+              pendingVerificationEmail: params.email,
               isLoading: false,
               error: null,
             });
@@ -121,6 +143,65 @@ const useAuth = create<AuthStore>()(
             'Signup failed';
           set({
             user: null,
+            isLoading: false,
+            error: errorMessage,
+            pendingVerificationEmail: null,
+          });
+          throw error;
+        }
+      },
+
+      verifyEmail: async (params: IVerifyEmailParams) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await verifyEmail(params);
+          if (response.data.success && response.data.data) {
+            const { accessToken, refreshToken, user } = response.data.data;
+            setTokens(accessToken, refreshToken);
+            set({
+              user,
+              isLoading: false,
+              error: null,
+              pendingVerificationEmail: null,
+            });
+          } else {
+            throw new Error(
+              response.data.message || 'Email verification failed'
+            );
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Email verification failed';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
+          throw error;
+        }
+      },
+
+      resendVerificationOtp: async (params: IResendVerificationOtpParams) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await resendVerificationOtp(params);
+          if (response.data.success) {
+            set({
+              isLoading: false,
+              error: null,
+            });
+          } else {
+            throw new Error(response.data.message || 'Failed to resend OTP');
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Failed to resend OTP';
+          set({
             isLoading: false,
             error: errorMessage,
           });
@@ -205,6 +286,116 @@ const useAuth = create<AuthStore>()(
         set({ error: null });
       },
 
+      setPendingVerificationEmail: (email: string | null) => {
+        set({ pendingVerificationEmail: email });
+      },
+
+      forgotPassword: async (params: IForgotPasswordParams) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await forgotPassword(params);
+          if (response.data.success) {
+            set({
+              isLoading: false,
+              error: null,
+            });
+          } else {
+            throw new Error(
+              response.data.message || 'Failed to send reset code'
+            );
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Failed to send reset code';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
+          throw error;
+        }
+      },
+
+      resetPassword: async (params: IResetPasswordParams) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await resetPassword(params);
+          if (response.data.success) {
+            set({
+              isLoading: false,
+              error: null,
+            });
+          } else {
+            throw new Error(response.data.message || 'Password reset failed');
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Password reset failed';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
+          throw error;
+        }
+      },
+
+      sendChangePasswordOtp: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await sendChangePasswordOtp();
+          if (response.data.success) {
+            set({
+              isLoading: false,
+              error: null,
+            });
+          } else {
+            throw new Error(response.data.message || 'Failed to send OTP');
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Failed to send OTP';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
+          throw error;
+        }
+      },
+
+      changePassword: async (params: IChangePasswordParams) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await changePassword(params);
+          if (response.data.success) {
+            set({
+              isLoading: false,
+              error: null,
+            });
+          } else {
+            throw new Error(response.data.message || 'Password change failed');
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Password change failed';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
+          throw error;
+        }
+      },
+
       initializeAuth: async () => {
         set({ isLoading: true });
         try {
@@ -272,6 +463,7 @@ const useAuth = create<AuthStore>()(
       // Chỉ lưu user, không lưu isAuthenticated để tránh hack
       partialize: (state) => ({
         user: state.user,
+        pendingVerificationEmail: state.pendingVerificationEmail,
       }),
     }
   )

@@ -11,6 +11,11 @@ import {
   IIntrospectResponse,
   IAuthResponse,
   IAuthUser,
+  IVerifyEmailParams,
+  IResendVerificationOtpParams,
+  IForgotPasswordParams,
+  IResetPasswordParams,
+  IChangePasswordParams,
 } from '@/types/api.types';
 import { AUTH_ENDPOINTS } from '@/utils/constants/api';
 
@@ -68,11 +73,12 @@ class AuthService {
 
   /**
    * Logout
+   * @param params - Optional refreshToken. If not provided, all refresh tokens for the user are revoked.
    */
   static async logout(
-    params: ILogoutParams
+    params?: ILogoutParams
   ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
-    return await axiosBI.post(AUTH_ENDPOINTS.LOGOUT, params);
+    return await axiosBI.post(AUTH_ENDPOINTS.LOGOUT, params || {});
   }
 
   /**
@@ -82,6 +88,60 @@ class AuthService {
     params: IIntrospectParams
   ): Promise<CustomAxiosResponse<ApiResponse<IIntrospectResponse>>> {
     return await axiosBI.post(AUTH_ENDPOINTS.INTROSPECT, params);
+  }
+
+  /**
+   * Verify email with OTP
+   */
+  static async verifyEmail(
+    params: IVerifyEmailParams
+  ): Promise<CustomAxiosResponse<ApiResponse<IAuthResponse>>> {
+    return await axiosBI.post(AUTH_ENDPOINTS.VERIFY_EMAIL, params);
+  }
+
+  /**
+   * Resend verification OTP
+   */
+  static async resendVerificationOtp(
+    params: IResendVerificationOtpParams
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.post(AUTH_ENDPOINTS.RESEND_VERIFICATION_OTP, params);
+  }
+
+  /**
+   * Forgot password - Send reset code
+   */
+  static async forgotPassword(
+    params: IForgotPasswordParams
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.post(AUTH_ENDPOINTS.FORGOT_PASSWORD, params);
+  }
+
+  /**
+   * Reset password with OTP
+   */
+  static async resetPassword(
+    params: IResetPasswordParams
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.post(AUTH_ENDPOINTS.RESET_PASSWORD, params);
+  }
+
+  /**
+   * Send change password OTP (authenticated)
+   */
+  static async sendChangePasswordOtp(): Promise<
+    CustomAxiosResponse<ApiResponse<null>>
+  > {
+    return await axiosBI.post(AUTH_ENDPOINTS.SEND_CHANGE_PASSWORD_OTP);
+  }
+
+  /**
+   * Change password (authenticated)
+   */
+  static async changePassword(
+    params: IChangePasswordParams
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.post(AUTH_ENDPOINTS.CHANGE_PASSWORD, params);
   }
 }
 

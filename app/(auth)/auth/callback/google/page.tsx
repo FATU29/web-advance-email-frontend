@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
@@ -11,24 +11,33 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import useAuth from '@/lib/stores/use-auth';
+import { useGoogleSignInMutation } from '@/hooks/use-auth-mutations';
 import { ROUTES } from '@/utils/constants/routes';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { AxiosError } from 'axios';
 
 type Status = 'loading' | 'success' | 'error';
 
 export default function GoogleCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const googleSignIn = useAuth((state) => state.googleSignIn);
-  const isLoading = useAuth((state) => state.isLoading);
-  const error = useAuth((state) => state.error);
+  const googleSignInMutation = useGoogleSignInMutation();
 
   const [status, setStatus] = useState<Status>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const hasProcessedRef = useRef(false);
 
   useEffect(() => {
+    // Prevent multiple calls - authorization code can only be used once
+    if (hasProcessedRef.current) {
+      return;
+    }
+
     const handleCallback = async () => {
+      // Mark as processed immediately to prevent duplicate calls
+      hasProcessedRef.current = true;
+
       try {
         // Get code from query params
         const code = searchParams.get('code');
@@ -53,26 +62,41 @@ export default function GoogleCallbackPage() {
         }
 
         // Call Google sign-in API
-        await googleSignIn({ code });
+        await googleSignInMutation.mutateAsync({ code });
 
         // Success - redirect to mail page
+        toast.success('Successfully signed in with Google');
         setStatus('success');
         setTimeout(() => {
           router.push(ROUTES.MAIL);
         }, 1500);
       } catch (err) {
+        const axiosError = err as AxiosError<{ message?: string }>;
         setStatus('error');
-        setErrorMessage(
-          error || 'Failed to authenticate with Google. Please try again.'
-        );
+
+        // Better error message handling
+        let errorMsg = 'Failed to authenticate with Google. Please try again.';
+
+        if (axiosError.response?.status === 401) {
+          errorMsg =
+            'Authorization code has expired or already been used. Please try logging in again.';
+        } else if (axiosError.response?.data?.message) {
+          errorMsg = axiosError.response.data.message;
+        } else if (axiosError.message) {
+          errorMsg = axiosError.message;
+        }
+
+        setErrorMessage(errorMsg);
+        toast.error(errorMsg);
       }
     };
 
     handleCallback();
-  }, [searchParams, googleSignIn, router, error]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty deps - only run once on mount
 
   // Loading state
-  if (status === 'loading' || isLoading) {
+  if (status === 'loading' || googleSignInMutation.isPending) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md">

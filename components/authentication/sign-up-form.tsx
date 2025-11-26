@@ -22,15 +22,16 @@ import {
 import { Input } from '@/components/ui/input';
 import { Field, FieldGroup, FieldError } from '@/components/ui/field';
 import { signupSchema, type SignupFormData } from '@/lib/validations/auth';
+import { useSignupMutation } from '@/hooks/use-auth-mutations';
 import useAuth from '@/lib/stores/use-auth';
 import { ROUTES } from '@/utils/constants/routes';
 import { getGoogleAuthUrl } from '@/utils/helpers/google-auth';
 import { AxiosError } from 'axios';
+import { toast } from 'sonner';
 
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   const router = useRouter();
-  const signup = useAuth((state) => state.signup);
-  const isLoading = useAuth((state) => state.isLoading);
+  const signupMutation = useSignupMutation();
   const error = useAuth((state) => state.error);
   const clearError = useAuth((state) => state.clearError);
 
@@ -53,9 +54,12 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     try {
       // Remove confirmPassword before sending to API
       const { confirmPassword: _confirmPassword, ...signupData } = data;
-      await signup(signupData);
-      // Redirect to mail page on success
-      router.push(ROUTES.MAIL);
+      await signupMutation.mutateAsync(signupData);
+      toast.success(
+        'Account created! Please check your email for verification code.'
+      );
+      // Redirect to verify OTP page on success
+      router.push(ROUTES.VERIFY_OTP);
     } catch (error) {
       const axiosError = error as AxiosError<{
         message?: string;
@@ -74,8 +78,14 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
             });
           }
         });
+      } else {
+        // Show error toast
+        const errorMessage =
+          axiosError.response?.data?.message ||
+          axiosError.message ||
+          'Signup failed';
+        toast.error(errorMessage);
       }
-      // General error is handled by store's error state
     }
   };
 
@@ -121,7 +131,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                         <Input
                           type="text"
                           placeholder="John Doe"
-                          disabled={isLoading}
+                          disabled={signupMutation.isPending}
                           {...field}
                         />
                       </FormControl>
@@ -141,7 +151,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                       <FormControl>
                         <Input
                           placeholder="m@example.com"
-                          disabled={isLoading}
+                          disabled={signupMutation.isPending}
                           {...field}
                         />
                       </FormControl>
@@ -162,7 +172,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                         <Input
                           type="password"
                           placeholder="Enter your password"
-                          disabled={isLoading}
+                          disabled={signupMutation.isPending}
                           {...field}
                         />
                       </FormControl>
@@ -183,7 +193,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
                         <Input
                           type="password"
                           placeholder="Confirm your password"
-                          disabled={isLoading}
+                          disabled={signupMutation.isPending}
                           {...field}
                         />
                       </FormControl>
@@ -195,14 +205,20 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 
               <FieldGroup>
                 <Field>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Creating account...' : 'Create Account'}
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={signupMutation.isPending}
+                  >
+                    {signupMutation.isPending
+                      ? 'Creating account...'
+                      : 'Create Account'}
                   </Button>
                   <Button
                     variant="outline"
                     type="button"
                     className="w-full"
-                    disabled={isLoading}
+                    disabled={signupMutation.isPending}
                     onClick={handleGoogleSignup}
                   >
                     Sign up with Google
