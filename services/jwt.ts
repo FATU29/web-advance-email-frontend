@@ -3,39 +3,47 @@
 
 import { decodeJwt } from 'jose';
 
-//==================== REGION IN-MEMORY TOKEN STORAGE ====================
+//==================== REGION TOKEN STORAGE ====================
 /**
- * In-memory storage for access token (more secure than localStorage)
- * Refresh token is stored in HttpOnly cookie by backend (not accessible to JS)
+ * Access token storage using localStorage
+ * - Persists across page refreshes for better UX
+ * - Refresh token is stored in HttpOnly cookie by backend (not accessible to JS)
+ *
+ * Security note: While localStorage is vulnerable to XSS, it provides better UX
+ * by maintaining session across page reloads. Combined with HttpOnly refresh token,
+ * this provides a good balance between security and usability.
  */
-let accessToken: string | null = null;
+const ACCESS_TOKEN_KEY = 'accessToken';
 
 //====================================================
 
 /**
- * Get access token from memory
+ * Get access token from localStorage
  */
 export const getAccessToken = (): string | null => {
-  return accessToken;
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(ACCESS_TOKEN_KEY);
 };
 
 /**
- * Set access token in memory
+ * Set access token in localStorage
  * @param token - JWT access token
  */
 export const setAccessToken = (token: string): void => {
-  accessToken = token;
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(ACCESS_TOKEN_KEY, token);
 };
 
 /**
- * Remove access token from memory
+ * Remove access token from localStorage
  */
 export const removeAccessToken = (): void => {
-  accessToken = null;
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
 };
 
 /**
- * Remove tokens (clear access token from memory)
+ * Remove tokens (clear access token from localStorage)
  * Note: Refresh token (HttpOnly cookie) is cleared by backend during logout
  */
 export const removeTokens = (): void => {
@@ -44,7 +52,7 @@ export const removeTokens = (): void => {
 
 /**
  * Set tokens - for backward compatibility
- * Now only stores access token in memory (refresh token is in HttpOnly cookie)
+ * Now only stores access token in localStorage (refresh token is in HttpOnly cookie)
  * @param accessToken - JWT access token
  * @param _refreshToken - Ignored (refresh token handled by backend via HttpOnly cookie)
  */
@@ -91,10 +99,42 @@ export const removeRefreshToken = (): void => {
 };
 
 /**
- * Check if user is authenticated (has access token)
+ * Check if a JWT token is expired
+ * @param token - JWT token string
+ * @returns true if token is expired, false otherwise
+ */
+export const isTokenExpired = (token: string): boolean => {
+  try {
+    const decoded = decodeJwt(token);
+    if (!decoded.exp) {
+      return true; // No expiration = treat as expired
+    }
+    // JWT exp is in seconds, Date.now() is in milliseconds
+    const currentTime = Math.floor(Date.now() / 1000);
+    return decoded.exp < currentTime;
+  } catch (error) {
+    console.error('Failed to check token expiration:', error);
+    return true; // If can't decode, treat as expired
+  }
+};
+
+/**
+ * Check if access token is valid and not expired
+ * @returns true if token exists and is not expired
+ */
+export const isAccessTokenValid = (): boolean => {
+  const token = getAccessToken();
+  if (!token) {
+    return false;
+  }
+  return !isTokenExpired(token);
+};
+
+/**
+ * Check if user is authenticated (has valid access token)
  */
 export const isAuthenticated = (): boolean => {
-  return !!getAccessToken();
+  return isAccessTokenValid();
 };
 
 /**

@@ -3,7 +3,6 @@ import {
   signup,
   googleSignIn,
   logout as logoutApi,
-  introspect,
   verifyEmail,
   resendVerificationOtp,
   forgotPassword,
@@ -12,7 +11,12 @@ import {
   changePassword,
 } from '@/api/auth';
 import AuthService from '@/services/auth.service';
-import { getAccessToken, removeTokens, setTokens } from '@/services/jwt';
+import {
+  getAccessToken,
+  removeTokens,
+  setTokens,
+  isAccessTokenValid,
+} from '@/services/jwt';
 import { decodeAccessToken } from '@/services/jwt';
 import {
   IAuthUser,
@@ -70,18 +74,9 @@ const useAuth = create<AuthStore>()(
       error: null,
       pendingVerificationEmail: null,
 
-      // Computed getter - kiểm tra token thực tế, không lưu trong state
+      // Computed getter - kiểm tra token thực tế và expiry, không lưu trong state
       getIsAuthenticated: () => {
-        const accessToken = getAccessToken();
-        if (!accessToken) {
-          return false;
-        }
-        try {
-          const decoded = decodeAccessToken();
-          return !!decoded;
-        } catch {
-          return false;
-        }
+        return isAccessTokenValid();
       },
 
       // Init actions
@@ -402,30 +397,14 @@ const useAuth = create<AuthStore>()(
             return;
           }
 
-          // Kiểm tra token có hợp lệ không (local check)
-          const decoded = decodeAccessToken();
-          if (!decoded) {
-            removeTokens();
-            set({ user: null, isLoading: false });
-            return;
-          }
+          console.warn('🔍 Checking authentication status...');
 
-          // Gọi API introspect để kiểm tra token hợp lệ trên server
+          // Gọi API để lấy user - nếu token expired/invalid (401/403),
+          // axios interceptor sẽ TỰ ĐỘNG refresh token và retry
           try {
-            const introspectResponse = await introspect({ token: accessToken });
-            if (
-              !introspectResponse.data.success ||
-              !introspectResponse.data.data?.isValid
-            ) {
-              // Token không hợp lệ trên server, xóa token và user
-              removeTokens();
-              set({ user: null, isLoading: false });
-              return;
-            }
-
-            // Token hợp lệ, lấy thông tin user mới nhất từ server
             const userResponse = await AuthService.getCurrentUser();
             if (userResponse.data.success && userResponse.data.data) {
+              console.warn('✅ User authenticated successfully');
               set({
                 user: userResponse.data.data,
                 isLoading: false,
@@ -433,24 +412,37 @@ const useAuth = create<AuthStore>()(
               });
             } else {
               // Nếu API trả về lỗi, xóa user và token
+              console.warn('❌ Failed to fetch user data. Clearing tokens...');
               removeTokens();
               set({ user: null, isLoading: false });
             }
           } catch (error) {
-            // Nếu API call thất bại (401, 403, etc), xóa user và token
+            // Nếu API call thất bại sau khi đã thử refresh token
             const axiosError = error as AxiosError<{ message?: string }>;
+
+            // Chỉ logout nếu đã thử refresh mà vẫn thất bại
+            // (interceptor đã xử lý 401/403 và retry, nếu vẫn lỗi = refresh token hết hạn)
             if (
               axiosError.response?.status === 401 ||
               axiosError.response?.status === 403
             ) {
+              console.warn(
+                '❌ Auth failed after refresh attempt. Refresh token likely expired. Logging out...'
+              );
+              // Refresh token đã hết hạn hoặc không hợp lệ
               removeTokens();
               set({ user: null, isLoading: false });
             } else {
-              // Nếu lỗi khác, giữ nguyên user từ persist nhưng vẫn set loading false
+              console.warn(
+                '⚠️ Non-auth error occurred. Keeping user data from cache.',
+                axiosError.message
+              );
+              // Nếu lỗi khác (network, etc), giữ nguyên user từ persist
               set({ isLoading: false });
             }
           }
         } catch {
+          console.warn('❌ Unexpected error in initializeAuth');
           set({ user: null, isLoading: false });
         }
       },

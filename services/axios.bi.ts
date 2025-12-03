@@ -68,6 +68,10 @@ const redirectToLogin = () => {
 
 // Refresh access token using HttpOnly cookie
 const refreshAccessToken = async (): Promise<string | null> => {
+  console.warn(
+    '🔄 Attempting to refresh access token using HttpOnly cookie...'
+  );
+
   // Create a new axios instance without interceptors to avoid infinite loop
   const refreshAxios = axios.create({
     baseURL: API_BASE_URL,
@@ -87,6 +91,8 @@ const refreshAccessToken = async (): Promise<string | null> => {
     if (response.data.success && response.data.data) {
       const { accessToken } = response.data.data;
 
+      console.warn('✅ Token refresh successful! New access token received.');
+
       // Store only access token in memory
       // Refresh token is automatically updated in HttpOnly cookie by backend
       setAccessToken(accessToken);
@@ -94,13 +100,19 @@ const refreshAccessToken = async (): Promise<string | null> => {
       return accessToken;
     }
 
+    console.warn('❌ Token refresh failed: Invalid response from server');
     return null;
   } catch (error) {
     // Refresh token expired (401) or other error -> redirect to login
     const axiosError = error as AxiosError;
     if (axiosError.response?.status === 401) {
+      console.warn(
+        '❌ Refresh token expired or invalid. Redirecting to login...'
+      );
       // Refresh token expired or invalid
       redirectToLogin();
+    } else {
+      console.warn('❌ Token refresh error:', axiosError.message);
     }
     return null;
   }
@@ -143,16 +155,29 @@ const createAxiosInstance = (baseURL?: string): AxiosInstance => {
         _retry?: boolean;
       };
 
-      // Handle 401 Unauthorized - Access token expired
-      if (error.response?.status === 401 && !originalRequest._retry) {
+      // Handle 401 Unauthorized or 403 Forbidden - Access token expired or invalid
+      if (
+        (error.response?.status === 401 || error.response?.status === 403) &&
+        !originalRequest._retry
+      ) {
+        console.warn(
+          `⚠️ Received ${error.response?.status} ${error.response?.status === 401 ? 'Unauthorized' : 'Forbidden'}. Access token may be expired.`
+        );
+
         // Skip refresh if this is the refresh token endpoint itself
         if (originalRequest.url?.includes(REFRESH_TOKEN_ENDPOINT)) {
+          console.warn(
+            '❌ Refresh token endpoint returned error. Redirecting to login...'
+          );
           // Refresh token expired, redirect to login
           redirectToLogin();
           return Promise.reject(error);
         }
 
         if (isRefreshing) {
+          console.warn(
+            '⏳ Token refresh already in progress. Queuing request...'
+          );
           // If already refreshing, queue this request
           return new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
@@ -168,6 +193,7 @@ const createAxiosInstance = (baseURL?: string): AxiosInstance => {
             });
         }
 
+        console.warn('🔄 Starting token refresh process...');
         originalRequest._retry = true;
         isRefreshing = true;
 
@@ -175,6 +201,9 @@ const createAxiosInstance = (baseURL?: string): AxiosInstance => {
           const newAccessToken = await refreshAccessToken();
 
           if (newAccessToken) {
+            console.warn(
+              '✅ Token refreshed successfully. Retrying original request...'
+            );
             processQueue(null, newAccessToken);
 
             // Retry original request with new token
@@ -184,10 +213,14 @@ const createAxiosInstance = (baseURL?: string): AxiosInstance => {
 
             return instance(originalRequest);
           } else {
+            console.warn(
+              '❌ Failed to refresh token. Rejecting queued requests.'
+            );
             processQueue(error, null);
             return Promise.reject(error);
           }
         } catch (refreshError) {
+          console.warn('❌ Token refresh threw error:', refreshError);
           processQueue(refreshError as AxiosError, null);
           return Promise.reject(refreshError);
         } finally {
