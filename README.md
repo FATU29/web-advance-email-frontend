@@ -51,6 +51,7 @@ This project implements a modern email client that connects to Gmail via OAuth2 
 | **G04** | Advanced Features        | 🚧 Soon | TBA                                                  |
 |         | - Search & Filter        | 🚧      |                                                      |
 |         | - Push Notifications     | 🚧      |                                                      |
+| **G04** | Advanced Features        | 🚧 Soon | [Watch](https://youtu.be/c7dfVpS_bow)                |
 
 ### Screenshots
 
