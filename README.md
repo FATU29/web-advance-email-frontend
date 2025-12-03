@@ -39,6 +39,9 @@ This project implements a modern email client that connects to Gmail via OAuth2 
 
 ## 🎥 Demo & Videos
 
+- G03 (Core Email Functionality): https://www.youtube.com/watch?v=1_uFQTqI6d4
+- G04 (Advanced Features): https://youtu.be/c7dfVpS_bow
+
 ### Feature Demonstrations
 
 | Group   | Feature                  | Status  | Demo Link                                            |
