@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -30,15 +31,28 @@ import {
   FieldError,
 } from '@/components/ui/field';
 import { otpSchema, type OTPFormData } from '@/lib/validations/auth';
-import { getApiErrorMessages } from '@/utils/function';
-import { useState } from 'react';
+import {
+  useVerifyEmailMutation,
+  useResendVerificationOtpMutation,
+} from '@/hooks/use-auth-mutations';
+import useAuth from '@/lib/stores/use-auth';
+import { ROUTES } from '@/utils/constants/routes';
 import { AxiosError } from 'axios';
+import { toast } from 'sonner';
+import { useEffect } from 'react';
 
 export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isResending, setIsResending] = useState(false);
-  const [generalError, setGeneralError] = useState<string | null>(null);
-  const [resendError, setResendError] = useState<string | null>(null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const verifyEmailMutation = useVerifyEmailMutation();
+  const resendOtpMutation = useResendVerificationOtpMutation();
+  const pendingVerificationEmail = useAuth(
+    (state) => state.pendingVerificationEmail
+  );
+  const emailFromQuery = searchParams.get('email');
+
+  // Get email from store or query params
+  const email = pendingVerificationEmail || emailFromQuery || '';
 
   const form = useForm<OTPFormData>({
     resolver: zodResolver(otpSchema),
@@ -49,24 +63,36 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
     },
   });
 
-  const onSubmit = async (_data: OTPFormData) => {
-    setIsLoading(true);
-    setGeneralError(null);
+  // Redirect to signup if no email
+  useEffect(() => {
+    if (!email) {
+      router.push(ROUTES.SIGNUP);
+    }
+  }, [email, router]);
+
+  const onSubmit = async (data: OTPFormData) => {
+    if (!email) {
+      toast.error('Email is required');
+      router.push(ROUTES.SIGNUP);
+      return;
+    }
+
+    form.clearErrors();
 
     try {
-      // TODO: Implement OTP verification API call
-      // const response = await verifyOtpApi(_data);
-      // setTokens(response.data.accessToken, response.data.refreshToken);
-      // router.push('/mail');
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await verifyEmailMutation.mutateAsync({
+        email,
+        code: data.otp,
+      });
+      toast.success('Email verified successfully!');
+      // Redirect to mail page on success
+      const redirectTo = searchParams.get('redirect') || ROUTES.MAIL;
+      router.push(redirectTo);
     } catch (error) {
       const axiosError = error as AxiosError<{
         message?: string;
         errors?: Record<string, string[]>;
       }>;
-      const errorMessage = getApiErrorMessages(axiosError);
 
       // Handle field-specific errors
       if (axiosError.response?.data?.errors) {
@@ -81,29 +107,33 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
           }
         });
       } else {
-        // Handle general error
-        setGeneralError(errorMessage);
+        // Show error toast
+        const errorMessage =
+          axiosError.response?.data?.message ||
+          axiosError.message ||
+          'Verification failed';
+        toast.error(errorMessage);
       }
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const handleResend = async () => {
-    setIsResending(true);
-    setResendError(null);
+    if (!email) {
+      toast.error('Email is required');
+      router.push(ROUTES.SIGNUP);
+      return;
+    }
 
     try {
-      // TODO: Implement resend OTP API call
-      // await resendOtpApi();
-
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await resendOtpMutation.mutateAsync({ email });
+      toast.success('Verification code sent to your email');
     } catch (error) {
-      const axiosError = error as AxiosError;
-      setResendError(getApiErrorMessages(axiosError));
-    } finally {
-      setIsResending(false);
+      const axiosError = error as AxiosError<{ message?: string }>;
+      const errorMessage =
+        axiosError.response?.data?.message ||
+        axiosError.message ||
+        'Failed to resend code';
+      toast.error(errorMessage);
     }
   };
 
@@ -111,15 +141,14 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
     <Card {...props}>
       <CardHeader>
         <CardTitle>Enter verification code</CardTitle>
-        <CardDescription>We sent a 6-digit code to your email.</CardDescription>
+        <CardDescription>
+          We sent a 6-digit code to {email || 'your email'}.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <FieldGroup>
-              {generalError && (
-                <FieldError className="text-center">{generalError}</FieldError>
-              )}
               <FormField
                 control={form.control}
                 name="otp"
@@ -128,7 +157,11 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
                     <Field>
                       <FormLabel>Verification code</FormLabel>
                       <FormControl>
-                        <InputOTP maxLength={6} disabled={isLoading} {...field}>
+                        <InputOTP
+                          maxLength={6}
+                          disabled={verifyEmailMutation.isPending}
+                          {...field}
+                        >
                           <InputOTPGroup className="gap-2.5 *:data-[slot=input-otp-slot]:rounded-md *:data-[slot=input-otp-slot]:border">
                             <InputOTPSlot index={0} />
                             <InputOTPSlot index={1} />
@@ -149,25 +182,24 @@ export function OTPForm({ ...props }: React.ComponentProps<typeof Card>) {
               />
 
               <FieldGroup>
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? 'Verifying...' : 'Verify'}
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={verifyEmailMutation.isPending || !email}
+                >
+                  {verifyEmailMutation.isPending ? 'Verifying...' : 'Verify'}
                 </Button>
                 <FieldDescription className="text-center">
                   Didn&apos;t receive the code?{' '}
                   <button
                     type="button"
                     onClick={handleResend}
-                    disabled={isResending}
+                    disabled={resendOtpMutation.isPending || !email}
                     className="underline-offset-4 hover:underline disabled:opacity-50"
                   >
-                    {isResending ? 'Resending...' : 'Resend'}
+                    {resendOtpMutation.isPending ? 'Resending...' : 'Resend'}
                   </button>
                 </FieldDescription>
-                {resendError && (
-                  <FieldError className="text-center text-sm">
-                    {resendError}
-                  </FieldError>
-                )}
               </FieldGroup>
             </FieldGroup>
           </form>

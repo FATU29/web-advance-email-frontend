@@ -28,10 +28,12 @@ import {
   FieldError,
 } from '@/components/ui/field';
 import { loginSchema, type LoginFormData } from '@/lib/validations/auth';
+import { useLoginMutation } from '@/hooks/use-auth-mutations';
 import useAuth from '@/lib/stores/use-auth';
 import { ROUTES } from '@/utils/constants/routes';
 import { getGoogleAuthUrl } from '@/utils/helpers/google-auth';
 import { AxiosError } from 'axios';
+import { toast } from 'sonner';
 
 export function LoginForm({
   className,
@@ -39,8 +41,7 @@ export function LoginForm({
 }: React.ComponentProps<'div'>) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const login = useAuth((state) => state.login);
-  const isLoading = useAuth((state) => state.isLoading);
+  const loginMutation = useLoginMutation();
   const error = useAuth((state) => state.error);
   const clearError = useAuth((state) => state.clearError);
 
@@ -59,7 +60,8 @@ export function LoginForm({
     form.clearErrors();
 
     try {
-      await login(data);
+      await loginMutation.mutateAsync(data);
+      toast.success('Login successful');
       // Redirect to redirect param or mail page on success
       const redirectTo = searchParams.get('redirect') || ROUTES.MAIL;
       router.push(redirectTo);
@@ -81,8 +83,14 @@ export function LoginForm({
             });
           }
         });
+      } else {
+        // Show error toast
+        const errorMessage =
+          axiosError.response?.data?.message ||
+          axiosError.message ||
+          'Login failed';
+        toast.error(errorMessage);
       }
-      // General error is handled by store's error state
     }
   };
 
@@ -128,7 +136,7 @@ export function LoginForm({
                         <FormControl>
                           <Input
                             placeholder="m@example.com"
-                            disabled={isLoading}
+                            disabled={loginMutation.isPending}
                             {...field}
                           />
                         </FormControl>
@@ -157,7 +165,7 @@ export function LoginForm({
                           <Input
                             type="password"
                             placeholder="Enter your password"
-                            disabled={isLoading}
+                            disabled={loginMutation.isPending}
                             {...field}
                           />
                         </FormControl>
@@ -168,14 +176,18 @@ export function LoginForm({
                 />
 
                 <Field>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Logging in...' : 'Login'}
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loginMutation.isPending}
+                  >
+                    {loginMutation.isPending ? 'Logging in...' : 'Login'}
                   </Button>
                   <Button
                     variant="outline"
                     type="button"
                     className="w-full"
-                    disabled={isLoading}
+                    disabled={loginMutation.isPending}
                     onClick={handleGoogleLogin}
                   >
                     Login with Google

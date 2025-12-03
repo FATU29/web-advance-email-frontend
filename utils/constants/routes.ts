@@ -6,6 +6,8 @@ export const ROUTES = {
   LOGIN: '/login',
   SIGNUP: '/signup',
   VERIFY_OTP: '/verify-otp',
+  FORGOT_PASSWORD: '/forgot-password',
+  RESET_PASSWORD: '/reset-password',
   GOOGLE_CALLBACK: '/auth/callback/google',
   // Mail routes
   MAIL: '/mail/inbox',

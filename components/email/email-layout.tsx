@@ -21,24 +21,34 @@ import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { EmailList } from './email-list';
 import { EmailDetail } from './email-detail';
-import { ParsedMessage } from '@/types';
+import { IEmailListItem, IEmailDetail } from '@/types/api.types';
 
 export interface EmailLayoutProps {
   // Sidebar content
   sidebar?: React.ReactNode;
 
   // Email list props
-  emails?: ParsedMessage[];
+  emails?: IEmailListItem[];
   loading?: boolean;
+  isLoadingMore?: boolean;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
   selectedEmails?: Set<string>;
   onEmailSelect?: (emailId: string, selected: boolean) => void;
+  onEmailClick?: (email: IEmailListItem) => void;
   onSelectAll?: (selected: boolean) => void;
+  onBulkAction?: (
+    action: 'read' | 'unread' | 'star' | 'unstar' | 'delete' | 'archive',
+    emailIds: string[]
+  ) => void;
   error?: string | null;
 
   // Detail props
-  onReply?: (email: ParsedMessage) => void;
-  onReplyAll?: (email: ParsedMessage) => void;
-  onForward?: (email: ParsedMessage) => void;
+  selectedEmail?: IEmailDetail;
+  onBack?: () => void;
+  onReply?: (email: IEmailDetail) => void;
+  onReplyAll?: (email: IEmailDetail) => void;
+  onForward?: (email: IEmailDetail) => void;
   onArchive?: (emailId: string) => void;
   onDelete?: (emailId: string) => void;
   onStar?: (emailId: string, starred: boolean) => void;
@@ -53,10 +63,17 @@ export function EmailLayout({
   sidebar,
   emails = [],
   loading = false,
+  isLoadingMore = false,
+  hasMore = false,
+  onLoadMore,
   selectedEmails = new Set(),
   onEmailSelect,
+  onEmailClick,
   onSelectAll,
+  onBulkAction,
   error = null,
+  selectedEmail,
+  onBack,
   onReply,
   onReplyAll,
   onForward,
@@ -68,19 +85,8 @@ export function EmailLayout({
   defaultListWidth = 35,
 }: EmailLayoutProps) {
   //Init state hook
-  const [selectedEmail, setSelectedEmail] =
-    React.useState<ParsedMessage | null>(null);
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const isMobile = useIsMobile();
-
-  //Init event handle
-  const handleEmailClick = (email: ParsedMessage) => {
-    setSelectedEmail(email);
-  };
-
-  const handleBack = () => {
-    setSelectedEmail(null);
-  };
 
   //Render mobile layout
   if (isMobile) {
@@ -127,10 +133,14 @@ export function EmailLayout({
               <EmailList
                 emails={emails}
                 loading={loading}
+                isLoadingMore={isLoadingMore}
+                hasMore={hasMore}
+                onLoadMore={onLoadMore}
                 selectedEmails={selectedEmails}
                 onEmailSelect={onEmailSelect}
-                onEmailClick={handleEmailClick}
+                onEmailClick={onEmailClick}
                 onSelectAll={onSelectAll}
+                onBulkAction={onBulkAction}
                 error={error}
               />
             </CardContent>
@@ -141,7 +151,7 @@ export function EmailLayout({
         {selectedEmail && (
           <Dialog
             open={!!selectedEmail}
-            onOpenChange={(open) => !open && handleBack()}
+            onOpenChange={(open) => !open && onBack?.()}
           >
             <DialogContent
               className="h-dvh w-dvw max-w-full p-0 m-0 rounded-none flex flex-col"
@@ -153,7 +163,7 @@ export function EmailLayout({
               <div className="flex-1 min-h-0 overflow-hidden">
                 <EmailDetail
                   email={selectedEmail}
-                  onBack={handleBack}
+                  onBack={onBack}
                   onReply={onReply}
                   onReplyAll={onReplyAll}
                   onForward={onForward}
@@ -206,10 +216,14 @@ export function EmailLayout({
               <EmailList
                 emails={emails}
                 loading={loading}
+                isLoadingMore={isLoadingMore}
+                hasMore={hasMore}
+                onLoadMore={onLoadMore}
                 selectedEmails={selectedEmails}
                 onEmailSelect={onEmailSelect}
-                onEmailClick={handleEmailClick}
+                onEmailClick={onEmailClick}
                 onSelectAll={onSelectAll}
+                onBulkAction={onBulkAction}
                 error={error}
               />
             </CardContent>
@@ -228,7 +242,7 @@ export function EmailLayout({
               <div className="h-full">
                 <EmailDetail
                   email={selectedEmail}
-                  onBack={handleBack}
+                  onBack={onBack}
                   onReply={onReply}
                   onReplyAll={onReplyAll}
                   onForward={onForward}

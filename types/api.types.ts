@@ -23,12 +23,16 @@ export interface IGoogleAuthParams {
   code: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface IRefreshTokenParams {
-  refreshToken: string;
+  // No longer needed - refresh token is sent automatically via HttpOnly cookie
+  // Kept for backward compatibility
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface ILogoutParams {
-  refreshToken: string;
+  // Optional refreshToken parameter removed
+  // Backend clears HttpOnly cookie automatically
 }
 
 export interface IIntrospectParams {
@@ -37,6 +41,31 @@ export interface IIntrospectParams {
 
 export interface IIntrospectResponse {
   isValid: boolean;
+}
+
+export interface IVerifyEmailParams {
+  email: string;
+  code: string;
+}
+
+export interface IResendVerificationOtpParams {
+  email: string;
+}
+
+export interface IForgotPasswordParams {
+  email: string;
+}
+
+export interface IResetPasswordParams {
+  email: string;
+  code: string;
+  newPassword: string;
+}
+
+export interface IChangePasswordParams {
+  currentPassword: string;
+  newPassword: string;
+  code: string;
 }
 
 export interface IAuthUser {
@@ -48,7 +77,7 @@ export interface IAuthUser {
 
 export interface IAuthTokens {
   accessToken: string;
-  refreshToken: string;
+  refreshToken: string | null; // null in HttpOnly cookie flow
   tokenType: string;
   expiresIn: number;
   user: IAuthUser;
@@ -56,7 +85,7 @@ export interface IAuthTokens {
 
 export interface IAuthResponse {
   accessToken: string;
-  refreshToken: string;
+  refreshToken: string | null; // null in HttpOnly cookie flow - actual token is in HttpOnly cookie
   tokenType: string;
   expiresIn: number;
   user: IAuthUser;
@@ -66,10 +95,12 @@ export interface IAuthResponse {
 export type MailboxType =
   | 'INBOX'
   | 'SENT'
-  | 'DRAFT'
+  | 'DRAFTS'
   | 'TRASH'
   | 'SPAM'
-  | 'ARCHIVE';
+  | 'STARRED'
+  | 'IMPORTANT'
+  | 'CUSTOM';
 
 export interface IMailbox {
   id: string;
@@ -127,11 +158,13 @@ export interface IPaginatedResponse<T> {
   totalElements: number;
   totalPages: number;
   last: boolean;
+  nextPageToken?: string | null;
 }
 
 export interface IGetEmailsParams {
   page?: number;
   size?: number;
+  pageToken?: string | null;
 }
 
 export type EmailAction =
@@ -143,6 +176,26 @@ export type EmailAction =
   | 'archive';
 
 export interface IBulkEmailActionParams {
+  emailIds: string[];
+  action: EmailAction;
+}
+
+export interface ISendEmailParams {
+  to: string[];
+  cc?: string[];
+  bcc?: string[];
+  subject: string;
+  body: string;
+  attachmentIds?: string[];
+}
+
+export interface IReplyEmailParams {
+  body: string;
+  replyAll?: boolean;
+  attachmentIds?: string[];
+}
+
+export interface IModifyEmailParams {
   emailIds: string[];
   action: EmailAction;
 }

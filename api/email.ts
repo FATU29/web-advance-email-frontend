@@ -9,6 +9,9 @@ export const markEmailAsRead = EmailService.markAsRead;
 export const markEmailAsUnread = EmailService.markAsUnread;
 export const toggleEmailStar = EmailService.toggleStar;
 export const deleteEmail = EmailService.delete;
+export const sendEmail = EmailService.send;
+export const replyEmail = EmailService.reply;
+export const modifyEmail = EmailService.modify;
 
 // Export service class
 export { EmailService };

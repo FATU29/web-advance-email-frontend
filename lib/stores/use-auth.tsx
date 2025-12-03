@@ -3,14 +3,19 @@ import {
   signup,
   googleSignIn,
   logout as logoutApi,
-  introspect,
+  verifyEmail,
+  resendVerificationOtp,
+  forgotPassword,
+  resetPassword,
+  sendChangePasswordOtp,
+  changePassword,
 } from '@/api/auth';
 import AuthService from '@/services/auth.service';
 import {
   getAccessToken,
-  getRefreshToken,
   removeTokens,
   setTokens,
+  isAccessTokenValid,
 } from '@/services/jwt';
 import { decodeAccessToken } from '@/services/jwt';
 import {
@@ -18,6 +23,11 @@ import {
   IUserLoginParams,
   IUserSignupParams,
   IGoogleAuthParams,
+  IVerifyEmailParams,
+  IResendVerificationOtpParams,
+  IForgotPasswordParams,
+  IResetPasswordParams,
+  IChangePasswordParams,
 } from '@/types/api.types';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -28,16 +38,26 @@ interface AuthState {
   user: IAuthUser | null;
   isLoading: boolean;
   error: string | null;
+  pendingVerificationEmail: string | null; // Email that needs OTP verification
 }
 
 interface AuthActions {
   login: (params: IUserLoginParams) => Promise<void>;
   signup: (params: IUserSignupParams) => Promise<void>;
+  verifyEmail: (params: IVerifyEmailParams) => Promise<void>;
+  resendVerificationOtp: (
+    params: IResendVerificationOtpParams
+  ) => Promise<void>;
   googleSignIn: (params: IGoogleAuthParams) => Promise<void>;
   logout: () => Promise<void>;
   refreshAuth: () => Promise<void>;
   clearError: () => void;
   initializeAuth: () => Promise<void>;
+  forgotPassword: (params: IForgotPasswordParams) => Promise<void>;
+  resetPassword: (params: IResetPasswordParams) => Promise<void>;
+  sendChangePasswordOtp: () => Promise<void>;
+  changePassword: (params: IChangePasswordParams) => Promise<void>;
+  setPendingVerificationEmail: (email: string | null) => void;
   // Computed getter - không lưu trong state để tránh hack
   getIsAuthenticated: () => boolean;
 }
@@ -52,19 +72,11 @@ const useAuth = create<AuthStore>()(
       user: null,
       isLoading: false,
       error: null,
+      pendingVerificationEmail: null,
 
-      // Computed getter - kiểm tra token thực tế, không lưu trong state
+      // Computed getter - kiểm tra token thực tế và expiry, không lưu trong state
       getIsAuthenticated: () => {
-        const accessToken = getAccessToken();
-        if (!accessToken) {
-          return false;
-        }
-        try {
-          const decoded = decodeAccessToken();
-          return !!decoded;
-        } catch {
-          return false;
-        }
+        return isAccessTokenValid();
       },
 
       // Init actions
@@ -73,8 +85,9 @@ const useAuth = create<AuthStore>()(
         try {
           const response = await login(params);
           if (response.data.success && response.data.data) {
-            const { accessToken, refreshToken, user } = response.data.data;
-            setTokens(accessToken, refreshToken);
+            const { accessToken, user } = response.data.data;
+            // Only store access token in memory (refresh token is in HttpOnly cookie)
+            setTokens(accessToken, null);
             set({
               user,
               isLoading: false,
@@ -102,11 +115,11 @@ const useAuth = create<AuthStore>()(
         set({ isLoading: true, error: null });
         try {
           const response = await signup(params);
-          if (response.data.success && response.data.data) {
-            const { accessToken, refreshToken, user } = response.data.data;
-            setTokens(accessToken, refreshToken);
+          if (response.data.success) {
+            // Signup successful, but user needs to verify email
+            // Store email for OTP verification
             set({
-              user,
+              pendingVerificationEmail: params.email,
               isLoading: false,
               error: null,
             });
@@ -123,6 +136,66 @@ const useAuth = create<AuthStore>()(
             user: null,
             isLoading: false,
             error: errorMessage,
+            pendingVerificationEmail: null,
+          });
+          throw error;
+        }
+      },
+
+      verifyEmail: async (params: IVerifyEmailParams) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await verifyEmail(params);
+          if (response.data.success && response.data.data) {
+            const { accessToken, user } = response.data.data;
+            // Only store access token in memory (refresh token is in HttpOnly cookie)
+            setTokens(accessToken, null);
+            set({
+              user,
+              isLoading: false,
+              error: null,
+              pendingVerificationEmail: null,
+            });
+          } else {
+            throw new Error(
+              response.data.message || 'Email verification failed'
+            );
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Email verification failed';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
+          throw error;
+        }
+      },
+
+      resendVerificationOtp: async (params: IResendVerificationOtpParams) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await resendVerificationOtp(params);
+          if (response.data.success) {
+            set({
+              isLoading: false,
+              error: null,
+            });
+          } else {
+            throw new Error(response.data.message || 'Failed to resend OTP');
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Failed to resend OTP';
+          set({
+            isLoading: false,
+            error: errorMessage,
           });
           throw error;
         }
@@ -133,8 +206,9 @@ const useAuth = create<AuthStore>()(
         try {
           const response = await googleSignIn(params);
           if (response.data.success && response.data.data) {
-            const { accessToken, refreshToken, user } = response.data.data;
-            setTokens(accessToken, refreshToken);
+            const { accessToken, user } = response.data.data;
+            // Only store access token in memory (refresh token is in HttpOnly cookie)
+            setTokens(accessToken, null);
             set({
               user,
               isLoading: false,
@@ -161,14 +235,13 @@ const useAuth = create<AuthStore>()(
       logout: async () => {
         set({ isLoading: true });
         try {
-          const refreshToken = getRefreshToken();
-          if (refreshToken) {
-            await logoutApi({ refreshToken });
-          }
+          // Call logout API - backend will clear HttpOnly cookie
+          await logoutApi();
         } catch (error) {
           // Continue with logout even if API call fails
           console.error('Logout API error:', error);
         } finally {
+          // Clear access token from memory
           removeTokens();
           set({
             user: null,
@@ -180,13 +253,13 @@ const useAuth = create<AuthStore>()(
 
       refreshAuth: async () => {
         try {
-          const refreshToken = getRefreshToken();
-          if (!refreshToken) {
+          const accessToken = getAccessToken();
+          if (!accessToken) {
             set({ user: null });
             return;
           }
 
-          // Token refresh is handled by axios interceptor
+          // Token refresh is handled by axios interceptor automatically
           // This method can be used to verify auth state
           const decoded = decodeAccessToken<{
             userId?: string;
@@ -195,7 +268,7 @@ const useAuth = create<AuthStore>()(
           if (!decoded) {
             set({ user: null });
           }
-          // Nếu token hợp lệ, giữ nguyên user state
+          // If token is valid, keep user state
         } catch {
           set({ user: null });
         }
@@ -203,6 +276,116 @@ const useAuth = create<AuthStore>()(
 
       clearError: () => {
         set({ error: null });
+      },
+
+      setPendingVerificationEmail: (email: string | null) => {
+        set({ pendingVerificationEmail: email });
+      },
+
+      forgotPassword: async (params: IForgotPasswordParams) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await forgotPassword(params);
+          if (response.data.success) {
+            set({
+              isLoading: false,
+              error: null,
+            });
+          } else {
+            throw new Error(
+              response.data.message || 'Failed to send reset code'
+            );
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Failed to send reset code';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
+          throw error;
+        }
+      },
+
+      resetPassword: async (params: IResetPasswordParams) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await resetPassword(params);
+          if (response.data.success) {
+            set({
+              isLoading: false,
+              error: null,
+            });
+          } else {
+            throw new Error(response.data.message || 'Password reset failed');
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Password reset failed';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
+          throw error;
+        }
+      },
+
+      sendChangePasswordOtp: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await sendChangePasswordOtp();
+          if (response.data.success) {
+            set({
+              isLoading: false,
+              error: null,
+            });
+          } else {
+            throw new Error(response.data.message || 'Failed to send OTP');
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Failed to send OTP';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
+          throw error;
+        }
+      },
+
+      changePassword: async (params: IChangePasswordParams) => {
+        set({ isLoading: true, error: null });
+        try {
+          const response = await changePassword(params);
+          if (response.data.success) {
+            set({
+              isLoading: false,
+              error: null,
+            });
+          } else {
+            throw new Error(response.data.message || 'Password change failed');
+          }
+        } catch (error) {
+          const axiosError = error as AxiosError<{ message?: string }>;
+          const errorMessage =
+            axiosError.response?.data?.message ||
+            axiosError.message ||
+            'Password change failed';
+          set({
+            isLoading: false,
+            error: errorMessage,
+          });
+          throw error;
+        }
       },
 
       initializeAuth: async () => {
@@ -214,30 +397,14 @@ const useAuth = create<AuthStore>()(
             return;
           }
 
-          // Kiểm tra token có hợp lệ không (local check)
-          const decoded = decodeAccessToken();
-          if (!decoded) {
-            removeTokens();
-            set({ user: null, isLoading: false });
-            return;
-          }
+          console.warn('🔍 Checking authentication status...');
 
-          // Gọi API introspect để kiểm tra token hợp lệ trên server
+          // Gọi API để lấy user - nếu token expired/invalid (401/403),
+          // axios interceptor sẽ TỰ ĐỘNG refresh token và retry
           try {
-            const introspectResponse = await introspect({ token: accessToken });
-            if (
-              !introspectResponse.data.success ||
-              !introspectResponse.data.data?.isValid
-            ) {
-              // Token không hợp lệ trên server, xóa token và user
-              removeTokens();
-              set({ user: null, isLoading: false });
-              return;
-            }
-
-            // Token hợp lệ, lấy thông tin user mới nhất từ server
             const userResponse = await AuthService.getCurrentUser();
             if (userResponse.data.success && userResponse.data.data) {
+              console.warn('✅ User authenticated successfully');
               set({
                 user: userResponse.data.data,
                 isLoading: false,
@@ -245,24 +412,37 @@ const useAuth = create<AuthStore>()(
               });
             } else {
               // Nếu API trả về lỗi, xóa user và token
+              console.warn('❌ Failed to fetch user data. Clearing tokens...');
               removeTokens();
               set({ user: null, isLoading: false });
             }
           } catch (error) {
-            // Nếu API call thất bại (401, 403, etc), xóa user và token
+            // Nếu API call thất bại sau khi đã thử refresh token
             const axiosError = error as AxiosError<{ message?: string }>;
+
+            // Chỉ logout nếu đã thử refresh mà vẫn thất bại
+            // (interceptor đã xử lý 401/403 và retry, nếu vẫn lỗi = refresh token hết hạn)
             if (
               axiosError.response?.status === 401 ||
               axiosError.response?.status === 403
             ) {
+              console.warn(
+                '❌ Auth failed after refresh attempt. Refresh token likely expired. Logging out...'
+              );
+              // Refresh token đã hết hạn hoặc không hợp lệ
               removeTokens();
               set({ user: null, isLoading: false });
             } else {
-              // Nếu lỗi khác, giữ nguyên user từ persist nhưng vẫn set loading false
+              console.warn(
+                '⚠️ Non-auth error occurred. Keeping user data from cache.',
+                axiosError.message
+              );
+              // Nếu lỗi khác (network, etc), giữ nguyên user từ persist
               set({ isLoading: false });
             }
           }
         } catch {
+          console.warn('❌ Unexpected error in initializeAuth');
           set({ user: null, isLoading: false });
         }
       },
@@ -272,6 +452,7 @@ const useAuth = create<AuthStore>()(
       // Chỉ lưu user, không lưu isAuthenticated để tránh hack
       partialize: (state) => ({
         user: state.user,
+        pendingVerificationEmail: state.pendingVerificationEmail,
       }),
     }
   )

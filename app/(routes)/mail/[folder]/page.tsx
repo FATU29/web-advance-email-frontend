@@ -2,34 +2,192 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 import { EmailLayout } from '@/components/email/email-layout';
-import { MockSidebar } from '@/mocks/sidebar';
-import { mockEmails } from '@/mocks/emails';
-import { ParsedMessage } from '@/types';
+import { Sidebar } from '@/components/email/sidebar';
+import { ComposeEmailDialog } from '@/components/email/compose-email-dialog';
 import { type Message } from '@/components/ui/chat-message';
 import { ChatDialog } from '@/components/chat/chat-dialog';
 import useAuth from '@/lib/stores/use-auth';
 import { ROUTES } from '@/utils/constants/routes';
+import {
+  useMailboxesQuery,
+  useEmailsInfiniteQuery,
+  useEmailQuery,
+  useDeleteEmailMutation,
+  useToggleEmailStarMutation,
+  useMarkEmailAsReadMutation,
+  useBulkEmailActionMutation,
+} from '@/hooks/use-email-mutations';
+import {
+  IEmailListItem,
+  IEmailDetail,
+  IPaginatedResponse,
+} from '@/types/api.types';
 
 export default function MailFolderPage({
-  params: _params,
+  params,
 }: {
-  params: { folder: string };
+  params: Promise<{ folder: string }>;
 }) {
   const router = useRouter();
   const logout = useAuth((state) => state.logout);
   const user = useAuth((state) => state.user);
 
+  // Unwrap params promise
+  const resolvedParams = React.use(params);
+
   //Init state hook
-  const [emails, setEmails] = React.useState<ParsedMessage[]>(mockEmails);
-  const [loading] = React.useState(false);
+  const [emailsList, setEmailsList] = React.useState<IEmailListItem[]>([]);
+  const loadedPagesCountRef = React.useRef(0);
   const [selectedEmails, setSelectedEmails] = React.useState<Set<string>>(
     new Set()
+  );
+  const [selectedEmailId, setSelectedEmailId] = React.useState<string | null>(
+    null
   );
   const [chatMessages, setChatMessages] = React.useState<Message[]>([]);
   const [chatInput, setChatInput] = React.useState('');
   const [isGenerating, setIsGenerating] = React.useState(false);
+  const [size] = React.useState(20);
+  const [composeOpen, setComposeOpen] = React.useState(false);
+  const [replyTo, setReplyTo] = React.useState<
+    | {
+        to: string[];
+        subject: string;
+        cc?: string[];
+      }
+    | undefined
+  >(undefined);
+
+  // Fetch mailboxes
+  const { data: mailboxes = [] } = useMailboxesQuery();
+
+  // Find mailbox by folder name
+  const currentMailbox = React.useMemo(() => {
+    const folder = resolvedParams.folder.toLowerCase();
+
+    // First try to find by exact id match
+    let mailbox = mailboxes.find((m) => m.id.toLowerCase() === folder);
+
+    // If not found, try to find by type mapping
+    if (!mailbox) {
+      const typeMap: Record<
+        string,
+        'INBOX' | 'SENT' | 'DRAFTS' | 'TRASH' | 'SPAM' | 'STARRED' | 'IMPORTANT'
+      > = {
+        inbox: 'INBOX',
+        sent: 'SENT',
+        drafts: 'DRAFTS',
+        draft: 'DRAFTS',
+        trash: 'TRASH',
+        spam: 'SPAM',
+        starred: 'STARRED',
+        important: 'IMPORTANT',
+      };
+      const mailboxType = typeMap[folder];
+      if (mailboxType) {
+        mailbox = mailboxes.find((m) => m.type === mailboxType);
+      }
+    }
+
+    // If still not found, try to find by name (case-insensitive)
+    if (!mailbox) {
+      mailbox = mailboxes.find((m) => m.name.toLowerCase() === folder);
+    }
+
+    return mailbox;
+  }, [mailboxes, resolvedParams.folder]);
+
+  // Fetch emails with infinite scroll
+  const {
+    data: emailsData,
+    isLoading: emailsLoading,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    error: emailsError,
+  } = useEmailsInfiniteQuery(currentMailbox?.id || '', size, {
+    enabled: !!currentMailbox?.id,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: false,
+  });
+
+  // Reset when mailbox changes
+  React.useEffect(() => {
+    if (currentMailbox?.id) {
+      setEmailsList([]);
+      loadedPagesCountRef.current = 0;
+      setSelectedEmails(new Set());
+      setSelectedEmailId(null);
+    }
+  }, [currentMailbox?.id]);
+
+  // Update emails list when pages change
+  React.useEffect(() => {
+    // Don't update if no mailbox is selected
+    if (!currentMailbox?.id) {
+      setEmailsList([]);
+      loadedPagesCountRef.current = 0;
+      return;
+    }
+
+    // If no data yet, clear list
+    if (!emailsData?.pages) {
+      // Only clear if we're not loading (to avoid clearing during initial load)
+      if (!emailsLoading) {
+        setEmailsList([]);
+        loadedPagesCountRef.current = 0;
+      }
+      return;
+    }
+
+    const currentPagesCount = emailsData.pages.length;
+    const loadedCount = loadedPagesCountRef.current;
+
+    // Initial load - set first page
+    if (currentPagesCount === 1 && loadedCount === 0) {
+      const firstPage = emailsData
+        .pages[0] as IPaginatedResponse<IEmailListItem>;
+      setEmailsList(firstPage.content);
+      loadedPagesCountRef.current = 1;
+      return;
+    }
+
+    // Load more - append new pages that haven't been loaded yet
+    if (currentPagesCount > loadedCount) {
+      // Get all new pages that haven't been loaded
+      const newPages = emailsData.pages.slice(
+        loadedCount
+      ) as IPaginatedResponse<IEmailListItem>[];
+      const allNewEmails = newPages.flatMap((page) => page.content);
+
+      // Append only new emails (not duplicates)
+      setEmailsList((prev) => {
+        const existingIds = new Set(prev.map((e) => e.id));
+        const uniqueNewEmails = allNewEmails.filter(
+          (email) => !existingIds.has(email.id)
+        );
+        return [...prev, ...uniqueNewEmails];
+      });
+
+      loadedPagesCountRef.current = currentPagesCount;
+    }
+  }, [emailsData?.pages, currentMailbox?.id, emailsLoading]);
+
+  const emails = emailsList;
+
+  // Fetch selected email detail
+  const { data: selectedEmail } = useEmailQuery(selectedEmailId || '', {
+    enabled: !!selectedEmailId,
+  });
+
+  // Mutations
+  const deleteEmailMutation = useDeleteEmailMutation();
+  const toggleStarMutation = useToggleEmailStarMutation();
+  const markAsReadMutation = useMarkEmailAsReadMutation();
+  const bulkActionMutation = useBulkEmailActionMutation();
 
   //Init event handle
   const handleEmailSelect = (emailId: string, selected: boolean) => {
@@ -44,45 +202,176 @@ export default function MailFolderPage({
 
   const handleSelectAll = (selected: boolean) => {
     if (selected) {
-      setSelectedEmails(new Set(emails.map((email) => email.id)));
+      setSelectedEmails(
+        new Set(emails.map((email: IEmailListItem) => email.id))
+      );
     } else {
       setSelectedEmails(new Set());
     }
   };
 
-  const handleReply = (_email: ParsedMessage) => {
-    // TODO: Implement reply functionality
+  const handleEmailClick = (email: IEmailListItem) => {
+    setSelectedEmailId(email.id);
+    // Mark as read if unread
+    if (!email.isRead) {
+      markAsReadMutation.mutate(email.id, {
+        onError: (error) => {
+          toast.error(
+            error instanceof Error
+              ? error.message
+              : 'Failed to mark email as read'
+          );
+        },
+      });
+    }
   };
 
-  const handleReplyAll = (_email: ParsedMessage) => {
-    // TODO: Implement reply all functionality
+  const handleReply = (email: IEmailDetail) => {
+    setReplyTo({
+      to: [email.from],
+      subject: email.subject.startsWith('Re: ')
+        ? email.subject
+        : `Re: ${email.subject}`,
+    });
+    setComposeOpen(true);
   };
 
-  const handleForward = (_email: ParsedMessage) => {
-    // TODO: Implement forward functionality
+  const handleReplyAll = (email: IEmailDetail) => {
+    const allRecipients = [...email.to];
+    if (email.cc && email.cc.length > 0) {
+      allRecipients.push(...email.cc);
+    }
+    // Remove current user's email from recipients
+    const filteredRecipients = allRecipients.filter((r) => r !== user?.email);
+
+    setReplyTo({
+      to: [email.from, ...filteredRecipients],
+      subject: email.subject.startsWith('Re: ')
+        ? email.subject
+        : `Re: ${email.subject}`,
+      cc: email.cc || undefined,
+    });
+    setComposeOpen(true);
   };
 
-  const handleArchive = (_emailId: string) => {
-    // TODO: Implement archive functionality
+  const handleForward = (email: IEmailDetail) => {
+    setReplyTo({
+      to: [],
+      subject: email.subject.startsWith('Fwd: ')
+        ? email.subject
+        : `Fwd: ${email.subject}`,
+    });
+    setComposeOpen(true);
+  };
+
+  const handleArchive = (emailId: string) => {
+    bulkActionMutation.mutate(
+      {
+        emailIds: [emailId],
+        action: 'archive',
+      },
+      {
+        onSuccess: () => {
+          toast.success('Email archived successfully');
+          if (selectedEmailId === emailId) {
+            setSelectedEmailId(null);
+          }
+          const newSelected = new Set(selectedEmails);
+          newSelected.delete(emailId);
+          setSelectedEmails(newSelected);
+        },
+        onError: (error) => {
+          toast.error(
+            error instanceof Error ? error.message : 'Failed to archive email'
+          );
+        },
+      }
+    );
+  };
+
+  const handleBulkAction = (
+    action: 'read' | 'unread' | 'star' | 'unstar' | 'delete' | 'archive',
+    emailIds: string[]
+  ) => {
+    bulkActionMutation.mutate(
+      {
+        emailIds,
+        action,
+      },
+      {
+        onSuccess: () => {
+          const actionLabels: Record<string, string> = {
+            read: 'marked as read',
+            unread: 'marked as unread',
+            star: 'starred',
+            unstar: 'unstarred',
+            delete: 'deleted',
+            archive: 'archived',
+          };
+          toast.success(
+            `${emailIds.length} email(s) ${actionLabels[action]} successfully`
+          );
+          // Clear selection after action
+          setSelectedEmails(new Set());
+          // Clear selected email if it was in the list
+          if (selectedEmailId && emailIds.includes(selectedEmailId)) {
+            if (action === 'delete' || action === 'archive') {
+              setSelectedEmailId(null);
+            }
+          }
+        },
+        onError: (error) => {
+          toast.error(
+            error instanceof Error ? error.message : 'Failed to perform action'
+          );
+        },
+      }
+    );
   };
 
   const handleDelete = (emailId: string) => {
-    setEmails(emails.filter((email) => email.id !== emailId));
-    const newSelected = new Set(selectedEmails);
-    newSelected.delete(emailId);
-    setSelectedEmails(newSelected);
+    deleteEmailMutation.mutate(emailId, {
+      onSuccess: () => {
+        toast.success('Email deleted successfully');
+        if (selectedEmailId === emailId) {
+          setSelectedEmailId(null);
+        }
+        const newSelected = new Set(selectedEmails);
+        newSelected.delete(emailId);
+        setSelectedEmails(newSelected);
+      },
+      onError: (error) => {
+        toast.error(
+          error instanceof Error ? error.message : 'Failed to delete email'
+        );
+      },
+    });
   };
 
-  const handleStar = (_emailId: string, _starred: boolean) => {
-    // TODO: Implement star functionality
+  const handleStar = (emailId: string, starred: boolean) => {
+    toggleStarMutation.mutate(
+      {
+        emailId,
+        starred,
+      },
+      {
+        onError: (error) => {
+          toast.error(
+            error instanceof Error ? error.message : 'Failed to toggle star'
+          );
+        },
+      }
+    );
   };
 
-  const handleSidebarItemClick = (_itemId: string) => {
-    // TODO: Implement folder navigation
+  const handleSidebarItemClick = (itemId: string) => {
+    // Navigate to folder
+    router.push(ROUTES.MAIL_FOLDER(itemId));
   };
 
   const handleComposeClick = () => {
-    // TODO: Implement compose email functionality
+    setReplyTo(undefined);
+    setComposeOpen(true);
   };
 
   const handleLogoutClick = async () => {
@@ -90,7 +379,7 @@ export default function MailFolderPage({
       await logout();
       // Redirect to login page after logout
       router.push(ROUTES.LOGIN);
-    } catch (error) {
+    } catch {
       // Even if logout API fails, redirect to login
       router.push(ROUTES.LOGIN);
     }
@@ -178,7 +467,8 @@ export default function MailFolderPage({
     <div className="relative flex h-screen w-full flex-col">
       <EmailLayout
         sidebar={
-          <MockSidebar
+          <Sidebar
+            mailboxes={mailboxes}
             user={
               user
                 ? {
@@ -189,22 +479,37 @@ export default function MailFolderPage({
                   }
                 : undefined
             }
+            activeFolder={resolvedParams.folder}
             onItemClick={handleSidebarItemClick}
             onComposeClick={handleComposeClick}
             onLogoutClick={handleLogoutClick}
           />
         }
         emails={emails}
-        loading={loading}
+        loading={emailsLoading}
+        isLoadingMore={isFetchingNextPage}
+        hasMore={hasNextPage || false}
+        onLoadMore={() => fetchNextPage()}
         selectedEmails={selectedEmails}
         onEmailSelect={handleEmailSelect}
+        onEmailClick={handleEmailClick}
         onSelectAll={handleSelectAll}
+        onBulkAction={handleBulkAction}
+        selectedEmail={selectedEmail || undefined}
+        onBack={() => setSelectedEmailId(null)}
         onReply={handleReply}
         onReplyAll={handleReplyAll}
         onForward={handleForward}
         onArchive={handleArchive}
         onDelete={handleDelete}
         onStar={handleStar}
+        error={
+          emailsError instanceof Error
+            ? emailsError.message
+            : emailsError
+              ? 'Failed to load emails'
+              : null
+        }
         className="h-full"
       />
 
@@ -225,6 +530,18 @@ export default function MailFolderPage({
           suggestions={chatSuggestions}
         />
       </div>
+
+      {/* Compose Email Dialog */}
+      <ComposeEmailDialog
+        open={composeOpen}
+        onOpenChange={(open) => {
+          setComposeOpen(open);
+          if (!open) {
+            setReplyTo(undefined);
+          }
+        }}
+        replyTo={replyTo}
+      />
     </div>
   );
 }
