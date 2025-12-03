@@ -5,8 +5,6 @@ import {
   IUserLoginParams,
   IUserSignupParams,
   IGoogleAuthParams,
-  IRefreshTokenParams,
-  ILogoutParams,
   IIntrospectParams,
   IIntrospectResponse,
   IAuthResponse,
@@ -64,21 +62,22 @@ class AuthService {
 
   /**
    * Refresh access token
+   * No body needed - refresh token is sent automatically via HttpOnly cookie
    */
-  static async refreshToken(
-    params: IRefreshTokenParams
-  ): Promise<CustomAxiosResponse<ApiResponse<IAuthResponse>>> {
-    return await axiosBI.post(AUTH_ENDPOINTS.REFRESH, params);
+  static async refreshToken(): Promise<
+    CustomAxiosResponse<ApiResponse<IAuthResponse>>
+  > {
+    // No parameters needed - browser sends refresh token cookie automatically
+    return await axiosBI.post(AUTH_ENDPOINTS.REFRESH);
   }
 
   /**
    * Logout
-   * @param params - Optional refreshToken. If not provided, all refresh tokens for the user are revoked.
+   * Clears HttpOnly cookie on backend
    */
-  static async logout(
-    params?: ILogoutParams
-  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
-    return await axiosBI.post(AUTH_ENDPOINTS.LOGOUT, params || {});
+  static async logout(): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    // No parameters needed - backend clears HttpOnly cookie
+    return await axiosBI.post(AUTH_ENDPOINTS.LOGOUT);
   }
 
   /**

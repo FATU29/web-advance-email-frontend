@@ -118,8 +118,16 @@ export const useEmailsQuery = (
     queryFn: async () => {
       const response = await getEmails(mailboxId, params);
       if (response.data.success && response.data.data) {
-        const { content, page, size, totalElements, totalPages, last } =
-          response.data.data;
+        const {
+          content,
+          page,
+          size,
+          totalElements,
+          totalPages,
+          last,
+          nextPageToken,
+        } = response.data.data;
+
         useEmail.setState({
           emails: content,
           pagination: {
@@ -128,8 +136,15 @@ export const useEmailsQuery = (
             totalElements,
             totalPages,
             last,
+            nextPageToken,
           },
         });
+
+        // Store nextPageToken in history for bidirectional navigation
+        if (nextPageToken !== undefined) {
+          useEmail.getState().addPageToken(nextPageToken, page);
+        }
+
         return response.data.data;
       }
       throw new Error(response.data.message || 'Failed to fetch emails');
@@ -151,17 +166,18 @@ export const useEmailsInfiniteQuery = (
       AxiosError,
       InfiniteData<IPaginatedResponse<IEmailListItem>>,
       readonly [string, string, string, 'infinite'],
-      number
+      string | null
     >,
     'queryKey' | 'queryFn' | 'getNextPageParam' | 'initialPageParam'
   >
 ) => {
   return useInfiniteQuery({
     queryKey: [...emailQueryKeys.emails(), mailboxId, 'infinite'],
-    queryFn: async ({ pageParam = 0 }: { pageParam: number }) => {
+    queryFn: async ({ pageParam }: { pageParam: string | null }) => {
       const response = await getEmails(mailboxId, {
-        page: pageParam,
+        page: 0, // Page number is not used for token-based pagination
         size,
+        pageToken: pageParam, // Use pageToken from previous response
       });
       if (response.data.success && response.data.data) {
         return response.data.data;
@@ -169,12 +185,13 @@ export const useEmailsInfiniteQuery = (
       throw new Error(response.data.message || 'Failed to fetch emails');
     },
     getNextPageParam: (lastPage: IPaginatedResponse<IEmailListItem>) => {
-      if (lastPage.last) {
+      // Return nextPageToken if available, undefined otherwise
+      if (lastPage.last || !lastPage.nextPageToken) {
         return undefined; // No more pages
       }
-      return (lastPage.page || 0) + 1;
+      return lastPage.nextPageToken;
     },
-    initialPageParam: 0,
+    initialPageParam: null, // First page has no token
     enabled: !!mailboxId,
     ...options,
   });

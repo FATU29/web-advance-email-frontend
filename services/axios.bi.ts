@@ -6,15 +6,16 @@ import axios, {
 } from 'axios';
 import { AUTH_ENDPOINTS } from '@/utils/constants/api';
 import { ROUTES } from '@/utils/constants/routes';
-import { getRefreshToken, setTokens, removeTokens, getAuthHeader } from './jwt';
+import { removeTokens, getAuthHeader, setAccessToken } from './jwt';
 import { API_BASE_URL } from '@/utils/constants/general';
 
 //==================== REGION TYPES ====================
 interface RefreshTokenResponse {
   success: boolean;
+  message: string;
   data: {
     accessToken: string;
-    refreshToken: string;
+    refreshToken: null; // Refresh token is in HttpOnly cookie, not in response
     tokenType: string;
     expiresIn: number;
     user: {
@@ -65,15 +66,8 @@ const redirectToLogin = () => {
   }
 };
 
-// Refresh access token using refresh token
+// Refresh access token using HttpOnly cookie
 const refreshAccessToken = async (): Promise<string | null> => {
-  const refreshToken = getRefreshToken();
-
-  if (!refreshToken) {
-    redirectToLogin();
-    return null;
-  }
-
   // Create a new axios instance without interceptors to avoid infinite loop
   const refreshAxios = axios.create({
     baseURL: API_BASE_URL,
@@ -81,21 +75,21 @@ const refreshAccessToken = async (): Promise<string | null> => {
     headers: {
       'Content-Type': 'application/json',
     },
+    withCredentials: true, // CRITICAL: Send HttpOnly cookie automatically
   });
 
   try {
+    // No body needed! Browser sends refresh token cookie automatically
     const response = await refreshAxios.post<RefreshTokenResponse>(
-      REFRESH_TOKEN_ENDPOINT,
-      {
-        refreshToken,
-      }
+      REFRESH_TOKEN_ENDPOINT
     );
 
     if (response.data.success && response.data.data) {
-      const { accessToken, refreshToken: newRefreshToken } = response.data.data;
+      const { accessToken } = response.data.data;
 
-      // Update tokens in cookies
-      setTokens(accessToken, newRefreshToken);
+      // Store only access token in memory
+      // Refresh token is automatically updated in HttpOnly cookie by backend
+      setAccessToken(accessToken);
 
       return accessToken;
     }
@@ -105,7 +99,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
     // Refresh token expired (401) or other error -> redirect to login
     const axiosError = error as AxiosError;
     if (axiosError.response?.status === 401) {
-      // Refresh token expired
+      // Refresh token expired or invalid
       redirectToLogin();
     }
     return null;

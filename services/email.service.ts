@@ -36,6 +36,10 @@ class EmailService {
     if (params?.size !== undefined) {
       queryParams.append('size', params.size.toString());
     }
+    // Add pageToken if provided (not null and not for first page)
+    if (params?.pageToken) {
+      queryParams.append('pageToken', params.pageToken);
+    }
 
     const queryString = queryParams.toString();
     const baseUrl = MAILBOX_ENDPOINTS.GET_EMAILS(mailboxId);

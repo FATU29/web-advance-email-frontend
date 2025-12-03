@@ -23,12 +23,16 @@ export interface IGoogleAuthParams {
   code: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface IRefreshTokenParams {
-  refreshToken: string;
+  // No longer needed - refresh token is sent automatically via HttpOnly cookie
+  // Kept for backward compatibility
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface ILogoutParams {
-  refreshToken?: string;
+  // Optional refreshToken parameter removed
+  // Backend clears HttpOnly cookie automatically
 }
 
 export interface IIntrospectParams {
@@ -73,7 +77,7 @@ export interface IAuthUser {
 
 export interface IAuthTokens {
   accessToken: string;
-  refreshToken: string;
+  refreshToken: string | null; // null in HttpOnly cookie flow
   tokenType: string;
   expiresIn: number;
   user: IAuthUser;
@@ -81,7 +85,7 @@ export interface IAuthTokens {
 
 export interface IAuthResponse {
   accessToken: string;
-  refreshToken: string;
+  refreshToken: string | null; // null in HttpOnly cookie flow - actual token is in HttpOnly cookie
   tokenType: string;
   expiresIn: number;
   user: IAuthUser;
@@ -154,11 +158,13 @@ export interface IPaginatedResponse<T> {
   totalElements: number;
   totalPages: number;
   last: boolean;
+  nextPageToken?: string | null;
 }
 
 export interface IGetEmailsParams {
   page?: number;
   size?: number;
+  pageToken?: string | null;
 }
 
 export type EmailAction =

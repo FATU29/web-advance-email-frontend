@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import { EmailLayout } from '@/components/email/email-layout';
 import { Sidebar } from '@/components/email/sidebar';
+import { ComposeEmailDialog } from '@/components/email/compose-email-dialog';
 import { type Message } from '@/components/ui/chat-message';
 import { ChatDialog } from '@/components/chat/chat-dialog';
 import useAuth from '@/lib/stores/use-auth';
@@ -50,6 +51,15 @@ export default function MailFolderPage({
   const [chatInput, setChatInput] = React.useState('');
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [size] = React.useState(20);
+  const [composeOpen, setComposeOpen] = React.useState(false);
+  const [replyTo, setReplyTo] = React.useState<
+    | {
+        to: string[];
+        subject: string;
+        cc?: string[];
+      }
+    | undefined
+  >(undefined);
 
   // Fetch mailboxes
   const { data: mailboxes = [] } = useMailboxesQuery();
@@ -169,12 +179,9 @@ export default function MailFolderPage({
   const emails = emailsList;
 
   // Fetch selected email detail
-  const { data: selectedEmail, isLoading: emailDetailLoading } = useEmailQuery(
-    selectedEmailId || '',
-    {
-      enabled: !!selectedEmailId,
-    }
-  );
+  const { data: selectedEmail } = useEmailQuery(selectedEmailId || '', {
+    enabled: !!selectedEmailId,
+  });
 
   // Mutations
   const deleteEmailMutation = useDeleteEmailMutation();
@@ -219,19 +226,42 @@ export default function MailFolderPage({
     }
   };
 
-  const handleReply = (_email: IEmailDetail) => {
-    // TODO: Implement reply functionality
-    toast.info('Reply functionality coming soon');
+  const handleReply = (email: IEmailDetail) => {
+    setReplyTo({
+      to: [email.from],
+      subject: email.subject.startsWith('Re: ')
+        ? email.subject
+        : `Re: ${email.subject}`,
+    });
+    setComposeOpen(true);
   };
 
-  const handleReplyAll = (_email: IEmailDetail) => {
-    // TODO: Implement reply all functionality
-    toast.info('Reply all functionality coming soon');
+  const handleReplyAll = (email: IEmailDetail) => {
+    const allRecipients = [...email.to];
+    if (email.cc && email.cc.length > 0) {
+      allRecipients.push(...email.cc);
+    }
+    // Remove current user's email from recipients
+    const filteredRecipients = allRecipients.filter((r) => r !== user?.email);
+
+    setReplyTo({
+      to: [email.from, ...filteredRecipients],
+      subject: email.subject.startsWith('Re: ')
+        ? email.subject
+        : `Re: ${email.subject}`,
+      cc: email.cc || undefined,
+    });
+    setComposeOpen(true);
   };
 
-  const handleForward = (_email: IEmailDetail) => {
-    // TODO: Implement forward functionality
-    toast.info('Forward functionality coming soon');
+  const handleForward = (email: IEmailDetail) => {
+    setReplyTo({
+      to: [],
+      subject: email.subject.startsWith('Fwd: ')
+        ? email.subject
+        : `Fwd: ${email.subject}`,
+    });
+    setComposeOpen(true);
   };
 
   const handleArchive = (emailId: string) => {
@@ -340,7 +370,8 @@ export default function MailFolderPage({
   };
 
   const handleComposeClick = () => {
-    // TODO: Implement compose email functionality
+    setReplyTo(undefined);
+    setComposeOpen(true);
   };
 
   const handleLogoutClick = async () => {
@@ -499,6 +530,18 @@ export default function MailFolderPage({
           suggestions={chatSuggestions}
         />
       </div>
+
+      {/* Compose Email Dialog */}
+      <ComposeEmailDialog
+        open={composeOpen}
+        onOpenChange={(open) => {
+          setComposeOpen(open);
+          if (!open) {
+            setReplyTo(undefined);
+          }
+        }}
+        replyTo={replyTo}
+      />
     </div>
   );
 }

@@ -1,82 +1,93 @@
 // JWT token management service
+// Updated for HttpOnly cookie-based refresh token flow
 
 import { decodeJwt } from 'jose';
 
-import { getCookie, setCookie, removeCookie } from '@/utils/helpers/cookie';
+//==================== REGION IN-MEMORY TOKEN STORAGE ====================
+/**
+ * In-memory storage for access token (more secure than localStorage)
+ * Refresh token is stored in HttpOnly cookie by backend (not accessible to JS)
+ */
+let accessToken: string | null = null;
 
-//==================== REGION CONSTANTS ====================
-const ACCESS_TOKEN_COOKIE_NAME = 'access_token';
-const REFRESH_TOKEN_COOKIE_NAME = 'refresh_token';
-const TOKEN_EXPIRY_DAYS = 7; // Access token expiry in days
-const REFRESH_TOKEN_EXPIRY_DAYS = 30; // Refresh token expiry in days
 //====================================================
 
 /**
- * Get access token from cookie
+ * Get access token from memory
  */
 export const getAccessToken = (): string | null => {
-  return getCookie(ACCESS_TOKEN_COOKIE_NAME);
+  return accessToken;
 };
 
 /**
- * Get refresh token from cookie
- */
-export const getRefreshToken = (): string | null => {
-  return getCookie(REFRESH_TOKEN_COOKIE_NAME);
-};
-
-/**
- * Set access token to cookie
+ * Set access token in memory
+ * @param token - JWT access token
  */
 export const setAccessToken = (token: string): void => {
-  setCookie(ACCESS_TOKEN_COOKIE_NAME, token, {
-    expires: TOKEN_EXPIRY_DAYS,
-    path: '/',
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-  });
+  accessToken = token;
 };
 
 /**
- * Set refresh token to cookie
- */
-export const setRefreshToken = (token: string): void => {
-  setCookie(REFRESH_TOKEN_COOKIE_NAME, token, {
-    expires: REFRESH_TOKEN_EXPIRY_DAYS,
-    path: '/',
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
-  });
-};
-
-/**
- * Set both tokens to cookies
- */
-export const setTokens = (accessToken: string, refreshToken: string): void => {
-  setAccessToken(accessToken);
-  setRefreshToken(refreshToken);
-};
-
-/**
- * Remove access token from cookie
+ * Remove access token from memory
  */
 export const removeAccessToken = (): void => {
-  removeCookie(ACCESS_TOKEN_COOKIE_NAME);
+  accessToken = null;
 };
 
 /**
- * Remove refresh token from cookie
- */
-export const removeRefreshToken = (): void => {
-  removeCookie(REFRESH_TOKEN_COOKIE_NAME);
-};
-
-/**
- * Remove both tokens from cookies
+ * Remove tokens (clear access token from memory)
+ * Note: Refresh token (HttpOnly cookie) is cleared by backend during logout
  */
 export const removeTokens = (): void => {
   removeAccessToken();
-  removeRefreshToken();
+};
+
+/**
+ * Set tokens - for backward compatibility
+ * Now only stores access token in memory (refresh token is in HttpOnly cookie)
+ * @param accessToken - JWT access token
+ * @param _refreshToken - Ignored (refresh token handled by backend via HttpOnly cookie)
+ */
+export const setTokens = (
+  accessToken: string,
+  _refreshToken?: string | null
+): void => {
+  setAccessToken(accessToken);
+  // Refresh token is NOT stored on frontend - it's in HttpOnly cookie
+};
+
+/**
+ * Get refresh token - DEPRECATED
+ * Refresh token is now stored in HttpOnly cookie (not accessible to JavaScript)
+ * This function is kept for backward compatibility but always returns null
+ * @deprecated Refresh token is stored in HttpOnly cookie
+ */
+export const getRefreshToken = (): string | null => {
+  console.warn(
+    'getRefreshToken() is deprecated. Refresh token is stored in HttpOnly cookie.'
+  );
+  return null;
+};
+
+/**
+ * Set refresh token - DEPRECATED
+ * Refresh token is now stored in HttpOnly cookie by backend
+ * @deprecated Refresh token is managed by backend via HttpOnly cookie
+ */
+export const setRefreshToken = (_token: string): void => {
+  console.warn(
+    'setRefreshToken() is deprecated. Refresh token is managed by backend via HttpOnly cookie.'
+  );
+};
+
+/**
+ * Remove refresh token - DEPRECATED
+ * @deprecated Refresh token is managed by backend via HttpOnly cookie
+ */
+export const removeRefreshToken = (): void => {
+  console.warn(
+    'removeRefreshToken() is deprecated. Refresh token is managed by backend via HttpOnly cookie.'
+  );
 };
 
 /**

@@ -20,7 +20,11 @@ interface EmailState {
     totalElements: number;
     totalPages: number;
     last: boolean;
+    nextPageToken?: string | null;
   } | null;
+
+  // Page token history for bidirectional navigation
+  pageTokenHistory: (string | null)[];
 
   // Actions loading
   actionLoading: boolean;
@@ -39,8 +43,12 @@ interface EmailActions {
       totalElements: number;
       totalPages: number;
       last: boolean;
+      nextPageToken?: string | null;
     } | null
   ) => void;
+  setPageTokenHistory: (tokens: (string | null)[]) => void;
+  addPageToken: (token: string | null, page: number) => void;
+  resetPagination: () => void;
 
   // Utility
   clearError: () => void;
@@ -61,6 +69,7 @@ const initialState: EmailState = {
   emailsError: null,
   pagination: null,
   actionLoading: false,
+  pageTokenHistory: [null], // First page has no token
 };
 
 const useEmail = create<EmailStore>((set) => ({
@@ -90,9 +99,35 @@ const useEmail = create<EmailStore>((set) => ({
       totalElements: number;
       totalPages: number;
       last: boolean;
+      nextPageToken?: string | null;
     } | null
   ) => {
     set({ pagination });
+  },
+
+  setPageTokenHistory: (tokens: (string | null)[]) => {
+    set({ pageTokenHistory: tokens });
+  },
+
+  addPageToken: (token: string | null, page: number) => {
+    set((state) => {
+      const newHistory = [...state.pageTokenHistory];
+      // Store token for next page
+      if (page + 1 < newHistory.length) {
+        newHistory[page + 1] = token;
+      } else {
+        newHistory.push(token);
+      }
+      return { pageTokenHistory: newHistory };
+    });
+  },
+
+  resetPagination: () => {
+    set({
+      pagination: null,
+      pageTokenHistory: [null],
+      emails: [],
+    });
   },
 
   // Init utility

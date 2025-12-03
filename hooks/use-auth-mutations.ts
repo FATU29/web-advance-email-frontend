@@ -11,12 +11,7 @@ import {
   changePassword,
 } from '@/api/auth';
 import AuthService from '@/services/auth.service';
-import {
-  getAccessToken,
-  getRefreshToken,
-  removeTokens,
-  setTokens,
-} from '@/services/jwt';
+import { getAccessToken, removeTokens, setTokens } from '@/services/jwt';
 import {
   IUserLoginParams,
   IUserSignupParams,
@@ -273,14 +268,13 @@ export const useLogoutMutation = () => {
     mutationFn: async () => {
       useAuth.setState({ isLoading: true });
       try {
-        const refreshToken = getRefreshToken();
-        if (refreshToken) {
-          await logoutApi({ refreshToken });
-        }
+        // Call logout API - backend will clear HttpOnly cookie
+        await logoutApi();
       } catch (error) {
         // Continue with logout even if API call fails
         console.error('Logout API error:', error);
       } finally {
+        // Clear access token from memory
         removeTokens();
         useAuth.setState({ user: null, isLoading: false, error: null });
       }

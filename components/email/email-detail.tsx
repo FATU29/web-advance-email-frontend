@@ -4,6 +4,8 @@ import * as React from 'react';
 import { format } from 'date-fns';
 import parse from 'html-react-parser';
 import DOMPurify from 'dompurify';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import {
   ArrowLeft,
   Archive,
@@ -117,6 +119,166 @@ export function EmailDetail({
     return textarea.value;
   };
 
+  // Detect content type
+  const detectContentType = (
+    content: string
+  ): 'html' | 'markdown' | 'plain' => {
+    if (!content) return 'plain';
+
+    // Check for HTML tags
+    const hasHTMLTags = /<[a-z][\s\S]*>/i.test(content);
+    if (hasHTMLTags) return 'html';
+
+    // Check for Markdown patterns
+    const markdownPatterns = [
+      /^#{1,6}\s/m, // Headers
+      /\*\*[^*]+\*\*/, // Bold
+      /\*[^*]+\*/, // Italic
+      /\[[^\]]+\]\([^)]+\)/, // Links
+      /^[-*+]\s/m, // Lists
+      /^>\s/m, // Blockquotes
+      /```[\s\S]*```/, // Code blocks
+      /`[^`]+`/, // Inline code
+    ];
+
+    const hasMarkdown = markdownPatterns.some((pattern) =>
+      pattern.test(content)
+    );
+    if (hasMarkdown) return 'markdown';
+
+    return 'plain';
+  };
+
+  // Render Markdown content
+  const renderMarkdown = (markdown: string) => {
+    return (
+      <div className="prose prose-sm dark:prose-invert max-w-none">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={{
+            // Custom components for better styling
+            h1: ({ ...props }) => (
+              <h1
+                className="text-2xl font-bold mb-4 mt-6 text-foreground"
+                {...props}
+              />
+            ),
+            h2: ({ ...props }) => (
+              <h2
+                className="text-xl font-bold mb-3 mt-5 text-foreground"
+                {...props}
+              />
+            ),
+            h3: ({ ...props }) => (
+              <h3
+                className="text-lg font-semibold mb-2 mt-4 text-foreground"
+                {...props}
+              />
+            ),
+            p: ({ ...props }) => (
+              <p className="mb-4 text-foreground leading-relaxed" {...props} />
+            ),
+            a: ({ ...props }) => (
+              <a
+                className="text-primary underline hover:no-underline"
+                target="_blank"
+                rel="noopener noreferrer"
+                {...props}
+              />
+            ),
+            code: ({ className, children, ...props }) => {
+              const isInline = !className;
+              return isInline ? (
+                <code
+                  className="bg-muted px-1.5 py-0.5 rounded text-foreground text-sm font-mono"
+                  {...props}
+                >
+                  {children}
+                </code>
+              ) : (
+                <code
+                  className="block bg-muted p-4 rounded-md overflow-x-auto text-foreground text-sm font-mono"
+                  {...props}
+                >
+                  {children}
+                </code>
+              );
+            },
+            pre: ({ ...props }) => (
+              <pre
+                className="bg-muted p-4 rounded-md overflow-x-auto my-4"
+                {...props}
+              />
+            ),
+            blockquote: ({ ...props }) => (
+              <blockquote
+                className="border-l-4 border-primary pl-4 italic my-4 text-foreground"
+                {...props}
+              />
+            ),
+            ul: ({ ...props }) => (
+              <ul className="list-disc ml-6 mb-4 text-foreground" {...props} />
+            ),
+            ol: ({ ...props }) => (
+              <ol
+                className="list-decimal ml-6 mb-4 text-foreground"
+                {...props}
+              />
+            ),
+            li: ({ ...props }) => (
+              <li className="mb-1 text-foreground" {...props} />
+            ),
+            img: ({ ...props }) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                className="max-w-full h-auto rounded-md my-4"
+                loading="lazy"
+                alt={props.alt || 'Image'}
+                {...props}
+              />
+            ),
+            table: ({ ...props }) => (
+              <div className="overflow-x-auto my-4">
+                <table className="w-full border-collapse" {...props} />
+              </div>
+            ),
+            th: ({ ...props }) => (
+              <th
+                className="border border-border p-2 bg-muted text-left font-semibold text-foreground"
+                {...props}
+              />
+            ),
+            td: ({ ...props }) => (
+              <td
+                className="border border-border p-2 text-foreground"
+                {...props}
+              />
+            ),
+            hr: ({ ...props }) => (
+              <hr className="my-6 border-border" {...props} />
+            ),
+          }}
+        >
+          {markdown}
+        </ReactMarkdown>
+      </div>
+    );
+  };
+
+  // Helper to filter out problematic attributes for React
+  const filterReactAttributes = (attribs: Record<string, string>) => {
+    const filtered: Record<string, string> = {};
+    for (const [key, value] of Object.entries(attribs)) {
+      // Skip 'style' - it's handled by DOMPurify and inline styles in sanitized HTML
+      // Skip event handlers
+      if (key === 'style' || key.startsWith('on')) {
+        continue;
+      }
+      filtered[key] = value;
+    }
+    return filtered;
+  };
+
   // Sanitize and parse HTML email body
   const renderEmailBody = (body: string) => {
     if (!body) return null;
@@ -160,37 +322,84 @@ export function EmailDetail({
     const isHTML = /<[a-z][\s\S]*>/i.test(decodedBody);
 
     if (isHTML) {
-      // Sanitize HTML to prevent XSS attacks
+      // Sanitize HTML to prevent XSS attacks - Enhanced for Gmail API
       const sanitizedHTML = DOMPurify.sanitize(decodedBody, {
         ALLOWED_TAGS: [
+          // Text formatting
           'p',
           'br',
           'strong',
+          'b',
           'em',
+          'i',
           'u',
+          's',
+          'strike',
+          'del',
+          'ins',
+          'mark',
+          'small',
+          'sub',
+          'sup',
+          // Headings
           'h1',
           'h2',
           'h3',
           'h4',
           'h5',
           'h6',
+          // Lists
           'ul',
           'ol',
           'li',
+          'dl',
+          'dt',
+          'dd',
+          // Links and media
           'a',
           'img',
+          // Quotes and code
           'blockquote',
+          'q',
+          'cite',
           'pre',
           'code',
+          'kbd',
+          'samp',
+          'var',
+          // Tables
           'table',
           'thead',
           'tbody',
+          'tfoot',
           'tr',
           'th',
           'td',
+          'caption',
+          'col',
+          'colgroup',
+          // Structure
           'div',
           'span',
+          'section',
+          'article',
+          'header',
+          'footer',
+          'main',
+          'aside',
+          'nav',
+          'figure',
+          'figcaption',
+          // Misc
           'hr',
+          'abbr',
+          'address',
+          'time',
+          'details',
+          'summary',
+          // Gmail often uses these
+          'center',
+          'font',
         ],
         ALLOWED_ATTR: [
           'href',
@@ -199,16 +408,38 @@ export function EmailDetail({
           'title',
           'width',
           'height',
-          'style',
+          'style', // Allow inline styles (will be sanitized by DOMPurify)
           'class',
+          'id',
           'align',
+          'valign',
           'colspan',
           'rowspan',
+          'border',
+          'cellpadding',
+          'cellspacing',
+          'bgcolor',
+          'color',
+          'face',
+          'size',
+          'target',
+          'rel',
+          'dir',
+          'lang',
+          'start',
+          'type',
+          'datetime',
         ],
         ALLOW_DATA_ATTR: false,
-        // Keep relative URLs and allow common protocols
+        // Keep relative URLs and allow common protocols (Gmail-safe)
         ALLOWED_URI_REGEXP:
           /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|sms|cid|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+        // Preserve Gmail's inline styles (DOMPurify auto-sanitizes dangerous ones)
+        KEEP_CONTENT: true,
+        RETURN_DOM: false,
+        RETURN_DOM_FRAGMENT: false,
+        // Allow Gmail's common style properties
+        ADD_ATTR: ['target'],
       });
 
       // Parse HTML to React elements
@@ -227,15 +458,17 @@ export function EmailDetail({
 
             // Handle images - make them responsive and safe
             if (node.name === 'img' && node.attribs) {
+              const safeAttribs = filterReactAttributes(node.attribs);
               return (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  {...node.attribs}
+                  {...safeAttribs}
                   alt={node.attribs.alt || 'Email image'}
                   className="max-w-full h-auto rounded-md my-2"
                   loading="lazy"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
                   }}
                 />
               );
@@ -252,9 +485,10 @@ export function EmailDetail({
                   // Keep original if decoding fails
                 }
               }
+              const safeAttribs = filterReactAttributes(node.attribs);
               return (
                 <a
-                  {...node.attribs}
+                  {...safeAttribs}
                   href={decodedHref}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -415,9 +649,73 @@ export function EmailDetail({
             {/* Email Body */}
             <div className="email-body-container min-h-[200px]">
               {email.body ? (
-                <div className="email-body-content text-sm leading-relaxed [&_p]:mb-4 [&_p]:text-foreground [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-6 [&_h1]:text-foreground [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-foreground [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-foreground [&_a]:text-primary [&_a]:underline [&_a:hover]:no-underline [&_strong]:font-semibold [&_strong]:text-foreground [&_em]:italic [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-foreground [&_code]:text-xs [&_pre]:bg-muted [&_pre]:p-4 [&_pre]:rounded-md [&_pre]:overflow-x-auto [&_pre]:text-foreground [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md [&_img]:my-4 [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-4 [&_ul]:text-foreground [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-4 [&_ol]:text-foreground [&_li]:mb-1 [&_li]:text-foreground [&_table]:w-full [&_table]:border-collapse [&_table]:my-4 [&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:bg-muted [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground [&_td]:border [&_td]:border-border [&_td]:p-2 [&_td]:text-foreground [&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-4 [&_blockquote]:text-foreground [&_hr]:my-6 [&_hr]:border-border">
-                  {renderEmailBody(email.body)}
-                </div>
+                (() => {
+                  const contentType = detectContentType(email.body);
+
+                  if (contentType === 'markdown') {
+                    // Render as Markdown
+                    return renderMarkdown(email.body);
+                  } else if (contentType === 'html') {
+                    // Render as HTML (existing implementation)
+                    return (
+                      <div
+                        className="email-body-content text-sm leading-relaxed 
+                        [&_p]:mb-4 [&_p]:text-foreground 
+                        [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-6 [&_h1]:text-foreground 
+                        [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-foreground 
+                        [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-foreground 
+                        [&_h4]:text-sm [&_h4]:font-semibold [&_h4]:mb-2 [&_h4]:mt-3 [&_h4]:text-foreground 
+                        [&_h5]:text-sm [&_h5]:font-medium [&_h5]:mb-1 [&_h5]:mt-2 [&_h5]:text-foreground 
+                        [&_h6]:text-xs [&_h6]:font-medium [&_h6]:mb-1 [&_h6]:mt-2 [&_h6]:text-foreground 
+                        [&_a]:text-primary [&_a]:underline [&_a:hover]:no-underline 
+                        [&_strong]:font-semibold [&_strong]:text-foreground 
+                        [&_b]:font-semibold [&_b]:text-foreground 
+                        [&_em]:italic [&_em]:text-foreground 
+                        [&_i]:italic [&_i]:text-foreground 
+                        [&_u]:underline [&_u]:text-foreground 
+                        [&_s]:line-through [&_s]:text-foreground 
+                        [&_strike]:line-through [&_strike]:text-foreground 
+                        [&_del]:line-through [&_del]:text-muted-foreground 
+                        [&_ins]:underline [&_ins]:text-foreground 
+                        [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-900 [&_mark]:px-1 [&_mark]:rounded 
+                        [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-foreground [&_code]:text-xs [&_code]:font-mono 
+                        [&_pre]:bg-muted [&_pre]:p-4 [&_pre]:rounded-md [&_pre]:overflow-x-auto [&_pre]:text-foreground [&_pre]:my-4 [&_pre]:font-mono 
+                        [&_kbd]:bg-muted [&_kbd]:px-2 [&_kbd]:py-1 [&_kbd]:rounded [&_kbd]:text-xs [&_kbd]:font-mono [&_kbd]:border [&_kbd]:border-border 
+                        [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md [&_img]:my-4 
+                        [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-4 [&_ul]:text-foreground 
+                        [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-4 [&_ol]:text-foreground 
+                        [&_li]:mb-1 [&_li]:text-foreground 
+                        [&_dl]:mb-4 [&_dt]:font-semibold [&_dt]:mb-1 [&_dd]:ml-6 [&_dd]:mb-2 
+                        [&_table]:w-full [&_table]:border-collapse [&_table]:my-4 [&_table]:text-foreground 
+                        [&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:bg-muted [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground 
+                        [&_td]:border [&_td]:border-border [&_td]:p-2 [&_td]:text-foreground 
+                        [&_caption]:text-sm [&_caption]:text-muted-foreground [&_caption]:mb-2 
+                        [&_blockquote]:border-l-4 [&_blockquote]:border-primary [&_blockquote]:pl-4 [&_blockquote]:italic [&_blockquote]:my-4 [&_blockquote]:text-foreground 
+                        [&_q]:italic [&_q]:text-foreground 
+                        [&_cite]:text-muted-foreground [&_cite]:text-sm 
+                        [&_hr]:my-6 [&_hr]:border-border 
+                        [&_abbr]:cursor-help [&_abbr]:underline [&_abbr]:decoration-dotted 
+                        [&_address]:not-italic [&_address]:text-foreground 
+                        [&_small]:text-xs [&_small]:text-muted-foreground 
+                        [&_sub]:text-xs [&_sub]:align-sub 
+                        [&_sup]:text-xs [&_sup]:align-super 
+                        [&_center]:text-center 
+                        [&_font]:text-foreground 
+                        [&_div]:text-foreground 
+                        [&_span]:text-foreground"
+                      >
+                        {renderEmailBody(email.body)}
+                      </div>
+                    );
+                  } else {
+                    // Render as plain text
+                    return (
+                      <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+                        {email.body}
+                      </div>
+                    );
+                  }
+                })()
               ) : (
                 <div className="whitespace-pre-wrap text-sm text-muted-foreground">
                   No content

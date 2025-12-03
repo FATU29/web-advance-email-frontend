@@ -12,12 +12,7 @@ import {
   changePassword,
 } from '@/api/auth';
 import AuthService from '@/services/auth.service';
-import {
-  getAccessToken,
-  getRefreshToken,
-  removeTokens,
-  setTokens,
-} from '@/services/jwt';
+import { getAccessToken, removeTokens, setTokens } from '@/services/jwt';
 import { decodeAccessToken } from '@/services/jwt';
 import {
   IAuthUser,
@@ -95,8 +90,9 @@ const useAuth = create<AuthStore>()(
         try {
           const response = await login(params);
           if (response.data.success && response.data.data) {
-            const { accessToken, refreshToken, user } = response.data.data;
-            setTokens(accessToken, refreshToken);
+            const { accessToken, user } = response.data.data;
+            // Only store access token in memory (refresh token is in HttpOnly cookie)
+            setTokens(accessToken, null);
             set({
               user,
               isLoading: false,
@@ -156,8 +152,9 @@ const useAuth = create<AuthStore>()(
         try {
           const response = await verifyEmail(params);
           if (response.data.success && response.data.data) {
-            const { accessToken, refreshToken, user } = response.data.data;
-            setTokens(accessToken, refreshToken);
+            const { accessToken, user } = response.data.data;
+            // Only store access token in memory (refresh token is in HttpOnly cookie)
+            setTokens(accessToken, null);
             set({
               user,
               isLoading: false,
@@ -214,8 +211,9 @@ const useAuth = create<AuthStore>()(
         try {
           const response = await googleSignIn(params);
           if (response.data.success && response.data.data) {
-            const { accessToken, refreshToken, user } = response.data.data;
-            setTokens(accessToken, refreshToken);
+            const { accessToken, user } = response.data.data;
+            // Only store access token in memory (refresh token is in HttpOnly cookie)
+            setTokens(accessToken, null);
             set({
               user,
               isLoading: false,
@@ -242,14 +240,13 @@ const useAuth = create<AuthStore>()(
       logout: async () => {
         set({ isLoading: true });
         try {
-          const refreshToken = getRefreshToken();
-          if (refreshToken) {
-            await logoutApi({ refreshToken });
-          }
+          // Call logout API - backend will clear HttpOnly cookie
+          await logoutApi();
         } catch (error) {
           // Continue with logout even if API call fails
           console.error('Logout API error:', error);
         } finally {
+          // Clear access token from memory
           removeTokens();
           set({
             user: null,
@@ -261,13 +258,13 @@ const useAuth = create<AuthStore>()(
 
       refreshAuth: async () => {
         try {
-          const refreshToken = getRefreshToken();
-          if (!refreshToken) {
+          const accessToken = getAccessToken();
+          if (!accessToken) {
             set({ user: null });
             return;
           }
 
-          // Token refresh is handled by axios interceptor
+          // Token refresh is handled by axios interceptor automatically
           // This method can be used to verify auth state
           const decoded = decodeAccessToken<{
             userId?: string;
@@ -276,7 +273,7 @@ const useAuth = create<AuthStore>()(
           if (!decoded) {
             set({ user: null });
           }
-          // Nếu token hợp lệ, giữ nguyên user state
+          // If token is valid, keep user state
         } catch {
           set({ user: null });
         }
