@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, LayoutGrid } from 'lucide-react';
 
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,7 @@ export interface EmailListFilterProps {
   onSearchChange: (query: string) => void;
   onSortChange: (sort: SortOption) => void;
   onFilterChange: (filter: FilterOption) => void;
+  onToggleKanban?: () => void;
 }
 
 export function EmailListFilter({
@@ -40,6 +41,7 @@ export function EmailListFilter({
   onSearchChange,
   onSortChange,
   onFilterChange,
+  onToggleKanban,
 }: EmailListFilterProps) {
   //Init state hook
   const isMobile = useIsMobile();
@@ -172,6 +174,18 @@ export function EmailListFilter({
             <SelectItem value="read">Read</SelectItem>
           </SelectContent>
         </Select>
+
+        {/* Kanban Toggle Button */}
+        {onToggleKanban && (
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={onToggleKanban}
+            title="Switch to Kanban view"
+          >
+            <LayoutGrid className="size-4" />
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { ROUTES } from '@/utils/constants/routes';
 
 import { EmailLayout } from '@/components/email/email-layout';
 import { Sidebar } from '@/components/email/sidebar';
@@ -10,7 +11,6 @@ import { ComposeEmailDialog } from '@/components/email/compose-email-dialog';
 import { type Message } from '@/components/ui/chat-message';
 import { ChatDialog } from '@/components/chat/chat-dialog';
 import useAuth from '@/lib/stores/use-auth';
-import { ROUTES } from '@/utils/constants/routes';
 import {
   useMailboxesQuery,
   useEmailsInfiniteQuery,
@@ -455,6 +455,10 @@ export default function MailFolderPage({
     }, 1000);
   };
 
+  const handleToggleKanban = () => {
+    router.push('/mail/kanban');
+  };
+
   const chatSuggestions = [
     'Summarize my emails',
     'Find important emails',
@@ -495,6 +499,7 @@ export default function MailFolderPage({
         onEmailClick={handleEmailClick}
         onSelectAll={handleSelectAll}
         onBulkAction={handleBulkAction}
+        onToggleKanban={handleToggleKanban}
         selectedEmail={selectedEmail || undefined}
         onBack={() => setSelectedEmailId(null)}
         onReply={handleReply}

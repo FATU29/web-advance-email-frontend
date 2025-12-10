@@ -121,6 +121,13 @@ export interface IEmailAttachment {
   url: string;
 }
 
+export type KanbanStatus =
+  | 'INBOX'
+  | 'TODO'
+  | 'IN_PROGRESS'
+  | 'DONE'
+  | 'SNOOZED';
+
 export interface IEmailListItem {
   id: string;
   from: string;
@@ -132,6 +139,9 @@ export interface IEmailListItem {
   isImportant: boolean;
   hasAttachments: boolean;
   receivedAt: string;
+  kanbanStatus?: KanbanStatus;
+  snoozeUntil?: string | null;
+  aiSummary?: string | null;
 }
 
 export interface IEmailDetail {
@@ -198,6 +208,25 @@ export interface IReplyEmailParams {
 export interface IModifyEmailParams {
   emailIds: string[];
   action: EmailAction;
+}
+
+// Kanban Types
+export interface IUpdateKanbanStatusParams {
+  emailId: string;
+  status: KanbanStatus;
+}
+
+export interface ISnoozeEmailParams {
+  emailId: string;
+  snoozeUntil: string; // ISO date string
+}
+
+export interface IGetEmailSummaryParams {
+  emailId: string;
+}
+
+export interface IEmailSummaryResponse {
+  summary: string;
 }
 
 //====================================================

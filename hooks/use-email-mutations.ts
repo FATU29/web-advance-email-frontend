@@ -9,6 +9,9 @@ import {
   deleteEmail,
   sendEmail,
   replyEmail,
+  updateKanbanStatus,
+  snoozeEmail,
+  getEmailSummary,
 } from '@/api/email';
 import {
   IMailbox,
@@ -19,6 +22,8 @@ import {
   ISendEmailParams,
   IReplyEmailParams,
   IPaginatedResponse,
+  KanbanStatus,
+  ISnoozeEmailParams,
 } from '@/types/api.types';
 import {
   useQuery,
@@ -442,6 +447,101 @@ export const useReplyEmailMutation = () => {
       queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
       queryClient.invalidateQueries({ queryKey: emailQueryKeys.mailboxes() });
     },
+  });
+};
+
+/**
+ * Update email kanban status mutation
+ */
+export const useUpdateKanbanStatusMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      emailId,
+      status,
+    }: {
+      emailId: string;
+      status: KanbanStatus;
+    }) => {
+      const response = await updateKanbanStatus(emailId, status);
+      if (response.data.success) {
+        // Update email in list
+        useEmail.setState((state) => ({
+          emails: state.emails.map((e) =>
+            e.id === emailId ? { ...e, kanbanStatus: status } : e
+          ),
+        }));
+        return response.data;
+      }
+      throw new Error(
+        response.data.message || 'Failed to update kanban status'
+      );
+    },
+    onSuccess: (_, { emailId }) => {
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.email(emailId),
+      });
+      queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
+    },
+  });
+};
+
+/**
+ * Snooze email mutation
+ */
+export const useSnoozeEmailMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      emailId,
+      snoozeUntil,
+    }: {
+      emailId: string;
+      snoozeUntil: string;
+    }) => {
+      const response = await snoozeEmail(emailId, snoozeUntil);
+      if (response.data.success) {
+        // Update email in list
+        useEmail.setState((state) => ({
+          emails: state.emails.map((e) =>
+            e.id === emailId
+              ? { ...e, snoozeUntil, kanbanStatus: 'SNOOZED' as KanbanStatus }
+              : e
+          ),
+        }));
+        return response.data;
+      }
+      throw new Error(response.data.message || 'Failed to snooze email');
+    },
+    onSuccess: (_, { emailId }) => {
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.email(emailId),
+      });
+      queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
+    },
+  });
+};
+
+/**
+ * Get email summary query
+ */
+export const useEmailSummaryQuery = (
+  emailId: string,
+  options?: Omit<UseQueryOptions<string, AxiosError>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: [...emailQueryKeys.email(emailId), 'summary'],
+    queryFn: async () => {
+      const response = await getEmailSummary(emailId);
+      if (response.data.success && response.data.data) {
+        return response.data.data.summary;
+      }
+      throw new Error(response.data.message || 'Failed to get email summary');
+    },
+    enabled: !!emailId,
+    ...options,
   });
 };
 

@@ -35,6 +35,10 @@ export const EMAIL_ENDPOINTS = {
   MARK_UNREAD: (emailId: string) => `/api/emails/${emailId}/unread`,
   TOGGLE_STAR: (emailId: string) => `/api/emails/${emailId}/star`,
   DELETE: (emailId: string) => `/api/emails/${emailId}`,
+  UPDATE_KANBAN_STATUS: (emailId: string) =>
+    `/api/emails/${emailId}/kanban-status`,
+  SNOOZE: (emailId: string) => `/api/emails/${emailId}/snooze`,
+  SUMMARY: (emailId: string) => `/api/emails/${emailId}/summary`,
 } as const;
 
 // Health check endpoint

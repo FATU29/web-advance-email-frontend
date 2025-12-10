@@ -133,13 +133,19 @@ export function Sidebar({
   onLogoutClick,
 }: SidebarProps) {
   //Init util function
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map((n) => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
+  const getInitials = (name?: string | null) => {
+    if (!name || typeof name !== 'string') {
+      return 'U';
+    }
+    return (
+      name
+        .split(' ')
+        .filter((n) => n.length > 0)
+        .map((n) => n[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2) || 'U'
+    );
   };
 
   const { standard, categories, others } = groupMailboxes(mailboxes);
@@ -152,17 +158,17 @@ export function Sidebar({
         <div className="border-b p-4">
           <div className="flex items-center gap-3">
             <Avatar className="size-10">
-              <AvatarImage src={user.avatar} alt={user.name} />
+              <AvatarImage src={user.avatar} alt={user.name || 'User'} />
               <AvatarFallback className="bg-primary/10 text-primary">
                 {getInitials(user.name)}
               </AvatarFallback>
             </Avatar>
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="truncate text-sm font-semibold">
-                {user.name}
+                {user.name || 'User'}
               </span>
               <span className="truncate text-xs text-muted-foreground">
-                {user.email}
+                {user.email || ''}
               </span>
             </div>
             {onLogoutClick && (

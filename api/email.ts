@@ -12,6 +12,9 @@ export const deleteEmail = EmailService.delete;
 export const sendEmail = EmailService.send;
 export const replyEmail = EmailService.reply;
 export const modifyEmail = EmailService.modify;
+export const updateKanbanStatus = EmailService.updateKanbanStatus;
+export const snoozeEmail = EmailService.snoozeEmail;
+export const getEmailSummary = EmailService.getEmailSummary;
 
 // Export service class
 export { EmailService };

@@ -52,6 +52,7 @@ export interface EmailLayoutProps {
   onArchive?: (emailId: string) => void;
   onDelete?: (emailId: string) => void;
   onStar?: (emailId: string, starred: boolean) => void;
+  onToggleKanban?: () => void;
 
   // Layout props
   className?: string;
@@ -80,6 +81,7 @@ export function EmailLayout({
   onArchive,
   onDelete,
   onStar,
+  onToggleKanban,
   className,
   defaultSidebarWidth = 20,
   defaultListWidth = 35,
@@ -141,6 +143,7 @@ export function EmailLayout({
                 onEmailClick={onEmailClick}
                 onSelectAll={onSelectAll}
                 onBulkAction={onBulkAction}
+                onToggleKanban={onToggleKanban}
                 error={error}
               />
             </CardContent>
@@ -224,6 +227,7 @@ export function EmailLayout({
                 onEmailClick={onEmailClick}
                 onSelectAll={onSelectAll}
                 onBulkAction={onBulkAction}
+                onToggleKanban={onToggleKanban}
                 error={error}
               />
             </CardContent>

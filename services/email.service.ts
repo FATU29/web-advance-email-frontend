@@ -10,6 +10,11 @@ import {
   ISendEmailParams,
   IReplyEmailParams,
   IModifyEmailParams,
+  IUpdateKanbanStatusParams,
+  ISnoozeEmailParams,
+  IGetEmailSummaryParams,
+  IEmailSummaryResponse,
+  KanbanStatus,
 } from '@/types/api.types';
 import { EMAIL_ENDPOINTS, MAILBOX_ENDPOINTS } from '@/utils/constants/api';
 
@@ -132,6 +137,39 @@ class EmailService {
     params: IModifyEmailParams
   ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
     return await axiosBI.post(EMAIL_ENDPOINTS.MODIFY(emailId), params);
+  }
+
+  /**
+   * Update email kanban status
+   */
+  static async updateKanbanStatus(
+    emailId: string,
+    status: KanbanStatus
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.patch(EMAIL_ENDPOINTS.UPDATE_KANBAN_STATUS(emailId), {
+      status,
+    });
+  }
+
+  /**
+   * Snooze email until a specific date
+   */
+  static async snoozeEmail(
+    emailId: string,
+    snoozeUntil: string
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.post(EMAIL_ENDPOINTS.SNOOZE(emailId), {
+      snoozeUntil,
+    });
+  }
+
+  /**
+   * Get AI summary for email
+   */
+  static async getEmailSummary(
+    emailId: string
+  ): Promise<CustomAxiosResponse<ApiResponse<IEmailSummaryResponse>>> {
+    return await axiosBI.get(EMAIL_ENDPOINTS.SUMMARY(emailId));
   }
 }
 

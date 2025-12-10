@@ -28,6 +28,7 @@ export interface EmailListProps extends MailListProps {
     action: 'read' | 'unread' | 'star' | 'unstar' | 'delete' | 'archive',
     emailIds: string[]
   ) => void;
+  onToggleKanban?: () => void;
   error?: string | null;
 }
 
@@ -42,6 +43,7 @@ export function EmailList({
   onEmailClick,
   onSelectAll,
   onBulkAction,
+  onToggleKanban,
   isCompact: isCompactProp = false,
   error = null,
 }: EmailListProps) {
@@ -366,6 +368,7 @@ export function EmailList({
         onSearchChange={setSearchQuery}
         onSortChange={setSortBy}
         onFilterChange={setFilterBy}
+        onToggleKanban={onToggleKanban}
       />
 
       {/* Email List */}
