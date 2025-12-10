@@ -2,7 +2,13 @@
 
 import * as React from 'react';
 import { format } from 'date-fns';
-import { Clock, ExternalLink, MoreVertical, Star } from 'lucide-react';
+import {
+  Clock,
+  ExternalLink,
+  MoreVertical,
+  Star,
+  Sparkles,
+} from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
@@ -32,6 +38,8 @@ export interface KanbanCardProps {
   onSnooze?: (email: IEmailListItem) => void;
   onStar?: (emailId: string, starred: boolean) => void;
   onStatusChange?: (emailId: string, status: KanbanStatus) => void;
+  onGenerateSummary?: (emailId: string) => void;
+  isGeneratingSummary?: boolean;
 }
 
 const STATUS_OPTIONS: Array<{ value: KanbanStatus; label: string }> = [
@@ -48,6 +56,8 @@ export function KanbanCard({
   onSnooze,
   onStar,
   onStatusChange,
+  onGenerateSummary,
+  isGeneratingSummary = false,
 }: KanbanCardProps) {
   //Init use hook
   const {
@@ -149,6 +159,11 @@ export function KanbanCard({
     }
   };
 
+  const handleGenerateSummary = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onGenerateSummary?.(email.id);
+  };
+
   const currentStatus = email.kanbanStatus || 'INBOX';
   const statusLabel =
     STATUS_OPTIONS.find((opt) => opt.value === currentStatus)?.label || 'INBOX';
@@ -226,6 +241,15 @@ export function KanbanCard({
                 align="end"
                 onClick={(e) => e.stopPropagation()}
               >
+                {!email.aiSummary && onGenerateSummary && (
+                  <DropdownMenuItem
+                    onClick={handleGenerateSummary}
+                    disabled={isGeneratingSummary}
+                  >
+                    <Sparkles className="size-4 mr-2" />
+                    {isGeneratingSummary ? 'Generating...' : 'Generate Summary'}
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={handleSnooze}>
                   <Clock className="size-4 mr-2" />
                   Snooze
@@ -249,11 +273,25 @@ export function KanbanCard({
         {/* AI Summary */}
         {email.aiSummary && (
           <div className="bg-gradient-to-br from-muted/60 to-muted/40 rounded-lg p-3 border border-border/50">
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <div className="size-1.5 rounded-full bg-primary"></div>
-              <span className="text-xs font-semibold text-foreground">
-                AI Summary
-              </span>
+            <div className="flex items-center justify-between gap-1.5 mb-1.5">
+              <div className="flex items-center gap-1.5">
+                <div className="size-1.5 rounded-full bg-primary"></div>
+                <span className="text-xs font-semibold text-foreground">
+                  AI Summary
+                </span>
+              </div>
+              {onGenerateSummary && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-5 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={handleGenerateSummary}
+                  disabled={isGeneratingSummary}
+                  title="Regenerate summary"
+                >
+                  <Sparkles className="size-3" />
+                </Button>
+              )}
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
               {email.aiSummary}
@@ -263,9 +301,25 @@ export function KanbanCard({
 
         {/* Preview (fallback if no AI summary) */}
         {!email.aiSummary && email.preview && (
-          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-            {email.preview}
-          </p>
+          <div className="relative">
+            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+              {email.preview}
+            </p>
+            {onGenerateSummary && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2 w-full text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                onClick={handleGenerateSummary}
+                disabled={isGeneratingSummary}
+              >
+                <Sparkles className="size-3 mr-1.5" />
+                {isGeneratingSummary
+                  ? 'Generating Summary...'
+                  : 'Generate AI Summary'}
+              </Button>
+            )}
+          </div>
         )}
 
         {/* Footer badges and status select */}

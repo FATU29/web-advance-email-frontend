@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { OTPForm } from '@/components/authentication/opt-form';
 
 export const metadata = {
@@ -6,5 +7,9 @@ export const metadata = {
 };
 
 export default function VerifyOTPPage() {
-  return <OTPForm />;
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <OTPForm />
+    </Suspense>
+  );
 }

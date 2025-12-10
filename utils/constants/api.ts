@@ -41,6 +41,22 @@ export const EMAIL_ENDPOINTS = {
   SUMMARY: (emailId: string) => `/api/emails/${emailId}/summary`,
 } as const;
 
+// Kanban endpoints
+export const KANBAN_ENDPOINTS = {
+  GET_BOARD: '/api/kanban/board',
+  GET_COLUMNS: '/api/kanban/columns',
+  GET_EMAILS_IN_COLUMN: (columnId: string) =>
+    `/api/kanban/columns/${columnId}/emails`,
+  ADD_EMAIL: '/api/kanban/emails',
+  GET_EMAIL_STATUS: (emailId: string) => `/api/kanban/emails/${emailId}`,
+  MOVE_EMAIL: '/api/kanban/emails/move',
+  REMOVE_EMAIL: (emailId: string) => `/api/kanban/emails/${emailId}`,
+  SNOOZE_EMAIL: '/api/kanban/emails/snooze',
+  UNSNOOZE_EMAIL: (emailId: string) => `/api/kanban/emails/${emailId}/unsnooze`,
+  GENERATE_SUMMARY: (emailId: string) =>
+    `/api/kanban/emails/${emailId}/summary`,
+} as const;
+
 // Health check endpoint
 export const HEALTH_ENDPOINTS = {
   CHECK: '/api/health',

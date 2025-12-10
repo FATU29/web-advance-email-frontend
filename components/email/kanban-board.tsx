@@ -26,6 +26,8 @@ export interface KanbanBoardProps {
   onCardClick?: (email: IEmailListItem) => void;
   onCardSnooze?: (email: IEmailListItem) => void;
   onCardStar?: (emailId: string, starred: boolean) => void;
+  onCardGenerateSummary?: (emailId: string) => void;
+  generatingSummaryIds?: Set<string>;
 }
 
 const COLUMNS: Array<{ id: KanbanStatus; title: string }> = [
@@ -42,6 +44,8 @@ export function KanbanBoard({
   onCardClick,
   onCardSnooze,
   onCardStar,
+  onCardGenerateSummary,
+  generatingSummaryIds = new Set(),
 }: KanbanBoardProps) {
   //Init state hook
   const [activeId, setActiveId] = React.useState<string | null>(null);
@@ -179,6 +183,8 @@ export function KanbanBoard({
                 onCardSnooze={onCardSnooze}
                 onCardStar={onCardStar}
                 onCardStatusChange={onStatusChange}
+                onCardGenerateSummary={onCardGenerateSummary}
+                generatingSummaryIds={generatingSummaryIds}
               />
             </SortableContext>
           );
@@ -193,6 +199,8 @@ export function KanbanBoard({
               onOpen={onCardClick}
               onSnooze={onCardSnooze}
               onStar={onCardStar}
+              onGenerateSummary={onCardGenerateSummary}
+              isGeneratingSummary={generatingSummaryIds.has(activeEmail.id)}
             />
           </div>
         ) : null}

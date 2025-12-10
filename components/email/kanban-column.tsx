@@ -17,6 +17,8 @@ export interface KanbanColumnProps {
   onCardSnooze?: (email: IEmailListItem) => void;
   onCardStar?: (emailId: string, starred: boolean) => void;
   onCardStatusChange?: (emailId: string, status: KanbanStatus) => void;
+  onCardGenerateSummary?: (emailId: string) => void;
+  generatingSummaryIds?: Set<string>;
 }
 
 export function KanbanColumn({
@@ -27,6 +29,8 @@ export function KanbanColumn({
   onCardSnooze,
   onCardStar,
   onCardStatusChange,
+  onCardGenerateSummary,
+  generatingSummaryIds = new Set(),
 }: KanbanColumnProps) {
   //Init use hook
   const { setNodeRef, isOver } = useDroppable({
@@ -76,6 +80,8 @@ export function KanbanColumn({
                   onSnooze={onCardSnooze}
                   onStar={onCardStar}
                   onStatusChange={onCardStatusChange}
+                  onGenerateSummary={onCardGenerateSummary}
+                  isGeneratingSummary={generatingSummaryIds.has(email.id)}
                 />
               ))
             )}

@@ -34,6 +34,12 @@ import {
   useUpdateKanbanStatusMutation,
   useSnoozeEmailMutation,
 } from '@/hooks/use-email-mutations';
+import {
+  useKanbanBoardQuery,
+  useGenerateSummaryMutation,
+  useMoveEmailMutation,
+  useSnoozeEmailKanbanMutation,
+} from '@/hooks/use-kanban-mutations';
 import { IEmailListItem, KanbanStatus } from '@/types/api.types';
 
 //==================== REGION MOCK DATA ====================
@@ -262,6 +268,9 @@ export default function KanbanPage() {
   const [viewMode, setViewMode] = React.useState<'kanban' | 'list'>('kanban');
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [isMounted, setIsMounted] = React.useState(false);
+  const [generatingSummaryIds, setGeneratingSummaryIds] = React.useState<
+    Set<string>
+  >(new Set());
 
   //Init effect hook - Prevent hydration mismatch with @dnd-kit
   React.useEffect(() => {
@@ -283,23 +292,61 @@ export default function KanbanPage() {
     return mailboxes.find((m) => m.type === 'INBOX') || mailboxes[0];
   }, [mailboxes]);
 
-  // Fetch emails with infinite scroll
+  // Fetch Kanban board data
+  const {
+    data: kanbanBoardData,
+    isLoading: kanbanLoading,
+    refetch: refetchKanbanBoard,
+  } = useKanbanBoardQuery({
+    enabled: !USE_MOCK_DATA,
+  });
+
+  // Fetch emails with infinite scroll (fallback for mock data)
   const { data: emailsData, isLoading: emailsLoading } = useEmailsInfiniteQuery(
     inboxMailbox?.id || '',
     50,
     {
-      enabled: !!inboxMailbox?.id && !USE_MOCK_DATA,
+      enabled: !!inboxMailbox?.id && USE_MOCK_DATA,
     }
   );
 
-  // Flatten emails from all pages or use mock data
+  // Convert Kanban board data to IEmailListItem format
   const emails = React.useMemo(() => {
     if (USE_MOCK_DATA) {
       return generateMockEmails();
     }
-    if (!emailsData?.pages) return [];
-    return emailsData.pages.flatMap((page) => page.content);
-  }, [emailsData]);
+    if (!kanbanBoardData) return [];
+
+    // Flatten emails from all columns
+    const allEmails: IEmailListItem[] = [];
+    Object.entries(kanbanBoardData.emailsByColumn).forEach(
+      ([columnId, kanbanEmails]) => {
+        kanbanEmails.forEach((kanbanEmail) => {
+          // Find column to get status
+          const column = kanbanBoardData.columns.find((c) => c.id === columnId);
+          const status = column?.type as KanbanStatus | undefined;
+
+          allEmails.push({
+            id: kanbanEmail.emailId,
+            from: kanbanEmail.fromEmail,
+            fromName: kanbanEmail.fromName,
+            subject: kanbanEmail.subject,
+            preview: kanbanEmail.preview,
+            isRead: kanbanEmail.isRead,
+            isStarred: kanbanEmail.isStarred,
+            isImportant: false, // Not available in Kanban response
+            hasAttachments: false, // Not available in Kanban response
+            receivedAt: kanbanEmail.receivedAt,
+            kanbanStatus: status,
+            snoozeUntil: kanbanEmail.snoozeUntil,
+            aiSummary: kanbanEmail.summary || undefined,
+          });
+        });
+      }
+    );
+
+    return allEmails;
+  }, [kanbanBoardData]);
 
   // Fetch AI summaries for emails that don't have them
   // Note: AI summaries should be fetched from the backend when needed
@@ -316,6 +363,9 @@ export default function KanbanPage() {
   const toggleStarMutation = useToggleEmailStarMutation();
   const updateKanbanStatusMutation = useUpdateKanbanStatusMutation();
   const snoozeEmailMutation = useSnoozeEmailMutation();
+  const moveEmailMutation = useMoveEmailMutation();
+  const snoozeEmailKanbanMutation = useSnoozeEmailKanbanMutation();
+  const generateSummaryMutation = useGenerateSummaryMutation();
 
   // Check for expired snoozes and restore them
   React.useEffect(() => {
@@ -354,19 +404,50 @@ export default function KanbanPage() {
 
   //Init event handle
   const handleStatusChange = (emailId: string, newStatus: KanbanStatus) => {
-    updateKanbanStatusMutation.mutate(
-      { emailId, status: newStatus },
-      {
-        onSuccess: () => {
-          toast.success('Email moved successfully');
-        },
-        onError: (error) => {
-          toast.error(
-            error instanceof Error ? error.message : 'Failed to move email'
-          );
-        },
+    if (USE_MOCK_DATA) {
+      // For mock data, use the old mutation
+      updateKanbanStatusMutation.mutate(
+        { emailId, status: newStatus },
+        {
+          onSuccess: () => {
+            toast.success('Email moved successfully');
+          },
+          onError: (error) => {
+            toast.error(
+              error instanceof Error ? error.message : 'Failed to move email'
+            );
+          },
+        }
+      );
+    } else {
+      // For real data, use Kanban move mutation
+      // Find the target column ID
+      const targetColumn = kanbanBoardData?.columns.find(
+        (c) => c.type === newStatus
+      );
+      if (!targetColumn) {
+        toast.error('Target column not found');
+        return;
       }
-    );
+
+      moveEmailMutation.mutate(
+        {
+          emailId,
+          targetColumnId: targetColumn.id,
+        },
+        {
+          onSuccess: () => {
+            toast.success('Email moved successfully');
+            refetchKanbanBoard();
+          },
+          onError: (error) => {
+            toast.error(
+              error instanceof Error ? error.message : 'Failed to move email'
+            );
+          },
+        }
+      );
+    }
   };
 
   const handleCardClick = (email: IEmailListItem) => {
@@ -381,22 +462,68 @@ export default function KanbanPage() {
   const handleSnoozeConfirm = (snoozeUntil: string) => {
     if (!emailToSnooze) return;
 
-    snoozeEmailMutation.mutate(
-      {
-        emailId: emailToSnooze.id,
-        snoozeUntil,
+    if (USE_MOCK_DATA) {
+      snoozeEmailMutation.mutate(
+        {
+          emailId: emailToSnooze.id,
+          snoozeUntil,
+        },
+        {
+          onSuccess: () => {
+            toast.success('Email snoozed successfully');
+          },
+          onError: (error) => {
+            toast.error(
+              error instanceof Error ? error.message : 'Failed to snooze email'
+            );
+          },
+        }
+      );
+    } else {
+      snoozeEmailKanbanMutation.mutate(
+        {
+          emailId: emailToSnooze.id,
+          snoozeUntil,
+        },
+        {
+          onSuccess: () => {
+            toast.success('Email snoozed successfully');
+            refetchKanbanBoard();
+          },
+          onError: (error) => {
+            toast.error(
+              error instanceof Error ? error.message : 'Failed to snooze email'
+            );
+          },
+        }
+      );
+    }
+  };
+
+  const handleGenerateSummary = (emailId: string) => {
+    setGeneratingSummaryIds((prev) => new Set(prev).add(emailId));
+
+    generateSummaryMutation.mutate(emailId, {
+      onSuccess: () => {
+        toast.success('Summary generated successfully');
+        refetchKanbanBoard();
+        setGeneratingSummaryIds((prev) => {
+          const next = new Set(prev);
+          next.delete(emailId);
+          return next;
+        });
       },
-      {
-        onSuccess: () => {
-          toast.success('Email snoozed successfully');
-        },
-        onError: (error) => {
-          toast.error(
-            error instanceof Error ? error.message : 'Failed to snooze email'
-          );
-        },
-      }
-    );
+      onError: (error) => {
+        toast.error(
+          error instanceof Error ? error.message : 'Failed to generate summary'
+        );
+        setGeneratingSummaryIds((prev) => {
+          const next = new Set(prev);
+          next.delete(emailId);
+          return next;
+        });
+      },
+    });
   };
 
   const handleStar = (emailId: string, starred: boolean) => {
@@ -590,10 +717,10 @@ export default function KanbanPage() {
         <div className="border-b p-4 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold">Kanban Board</h1>
-            {emailsLoading && (
+            {(kanbanLoading || emailsLoading) && (
               <span className="text-sm text-muted-foreground">Loading...</span>
             )}
-            {!emailsLoading && visibleEmails.length > 0 && (
+            {!kanbanLoading && !emailsLoading && visibleEmails.length > 0 && (
               <span className="text-sm text-muted-foreground">
                 {visibleEmails.length} email
                 {visibleEmails.length !== 1 ? 's' : ''}
@@ -615,7 +742,7 @@ export default function KanbanPage() {
                 <p className="text-muted-foreground">Loading...</p>
               </div>
             </div>
-          ) : emailsLoading ? (
+          ) : kanbanLoading || emailsLoading ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center space-y-2">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
@@ -641,6 +768,8 @@ export default function KanbanPage() {
               onCardClick={handleCardClick}
               onCardSnooze={handleSnooze}
               onCardStar={handleStar}
+              onCardGenerateSummary={handleGenerateSummary}
+              generatingSummaryIds={generatingSummaryIds}
             />
           )}
         </div>
