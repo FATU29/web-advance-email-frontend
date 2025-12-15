@@ -8,7 +8,14 @@ import { KANBAN_ENDPOINTS } from '@/utils/constants/api';
 export interface IKanbanColumn {
   id: string;
   name: string;
-  type: 'INBOX' | 'TODO' | 'IN_PROGRESS' | 'DONE' | 'SNOOZED' | 'CUSTOM';
+  type:
+    | 'INBOX'
+    | 'BACKLOG'
+    | 'TODO'
+    | 'IN_PROGRESS'
+    | 'DONE'
+    | 'SNOOZED'
+    | 'CUSTOM';
   order: number;
   color: string;
   isDefault: boolean;
@@ -57,6 +64,29 @@ export interface IMoveEmailRequest {
 export interface ISnoozeEmailRequest {
   emailId: string;
   snoozeUntil: string;
+}
+
+export interface IGmailStatusResponse {
+  connected: boolean;
+}
+
+export interface IKanbanSyncResult {
+  synced: number; // Number of emails successfully synced
+  skipped: number; // Number of emails skipped (already in Kanban)
+  total: number; // Total emails processed from Gmail
+  message: string; // Human-readable result message
+}
+
+export interface ICreateColumnRequest {
+  name: string;
+  color?: string;
+  order?: number;
+}
+
+export interface IUpdateColumnRequest {
+  name?: string;
+  color?: string;
+  order?: number;
 }
 
 //====================================================
@@ -156,6 +186,69 @@ class KanbanService {
     emailId: string
   ): Promise<CustomAxiosResponse<ApiResponse<IKanbanEmail>>> {
     return await axiosBI.post(KANBAN_ENDPOINTS.GENERATE_SUMMARY(emailId));
+  }
+
+  /**
+   * Check Gmail connection status
+   */
+  static async getGmailStatus(): Promise<
+    CustomAxiosResponse<ApiResponse<IGmailStatusResponse>>
+  > {
+    return await axiosBI.get(KANBAN_ENDPOINTS.GMAIL_STATUS);
+  }
+
+  /**
+   * Sync Gmail emails to Kanban board
+   * @param maxEmails - Maximum emails to sync (default: 50, max: 100)
+   */
+  static async syncGmail(
+    maxEmails: number = 50
+  ): Promise<CustomAxiosResponse<ApiResponse<IKanbanSyncResult>>> {
+    return await axiosBI.post(
+      `${KANBAN_ENDPOINTS.SYNC_GMAIL}?maxEmails=${maxEmails}`
+    );
+  }
+
+  /**
+   * Get board with optional sync parameter
+   * @param sync - If true, syncs new emails from Gmail before returning board
+   * @param maxEmails - Maximum emails to sync/display
+   */
+  static async getBoardWithSync(
+    sync: boolean = false,
+    maxEmails: number = 50
+  ): Promise<CustomAxiosResponse<ApiResponse<IKanbanBoard>>> {
+    return await axiosBI.get(
+      `${KANBAN_ENDPOINTS.GET_BOARD}?sync=${sync}&maxEmails=${maxEmails}`
+    );
+  }
+
+  /**
+   * Create a custom column
+   */
+  static async createColumn(
+    request: ICreateColumnRequest
+  ): Promise<CustomAxiosResponse<ApiResponse<IKanbanColumn>>> {
+    return await axiosBI.post(KANBAN_ENDPOINTS.CREATE_COLUMN, request);
+  }
+
+  /**
+   * Update a column
+   */
+  static async updateColumn(
+    columnId: string,
+    request: IUpdateColumnRequest
+  ): Promise<CustomAxiosResponse<ApiResponse<IKanbanColumn>>> {
+    return await axiosBI.put(KANBAN_ENDPOINTS.UPDATE_COLUMN(columnId), request);
+  }
+
+  /**
+   * Delete a column (emails moved to Backlog)
+   */
+  static async deleteColumn(
+    columnId: string
+  ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
+    return await axiosBI.delete(KANBAN_ENDPOINTS.DELETE_COLUMN(columnId));
   }
 }
 

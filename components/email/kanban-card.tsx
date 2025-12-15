@@ -22,14 +22,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { IEmailListItem, KanbanStatus } from '@/types/api.types';
+import { IEmailListItem } from '@/types/api.types';
 import { cn } from '@/lib/utils';
 
 export interface KanbanCardProps {
@@ -37,25 +30,15 @@ export interface KanbanCardProps {
   onOpen?: (email: IEmailListItem) => void;
   onSnooze?: (email: IEmailListItem) => void;
   onStar?: (emailId: string, starred: boolean) => void;
-  onStatusChange?: (emailId: string, status: KanbanStatus) => void;
   onGenerateSummary?: (emailId: string) => void;
   isGeneratingSummary?: boolean;
 }
-
-const STATUS_OPTIONS: Array<{ value: KanbanStatus; label: string }> = [
-  { value: 'INBOX', label: 'INBOX' },
-  { value: 'TODO', label: 'TO DO' },
-  { value: 'IN_PROGRESS', label: 'IN PROGRESS' },
-  { value: 'DONE', label: 'DONE' },
-  { value: 'SNOOZED', label: 'SNOOZED' },
-];
 
 export function KanbanCard({
   email,
   onOpen,
   onSnooze,
   onStar,
-  onStatusChange,
   onGenerateSummary,
   isGeneratingSummary = false,
 }: KanbanCardProps) {
@@ -153,20 +136,10 @@ export function KanbanCard({
     onStar?.(email.id, !email.isStarred);
   };
 
-  const handleStatusChange = (newStatus: KanbanStatus) => {
-    if (onStatusChange && email.kanbanStatus !== newStatus) {
-      onStatusChange(email.id, newStatus);
-    }
-  };
-
   const handleGenerateSummary = (e: React.MouseEvent) => {
     e.stopPropagation();
     onGenerateSummary?.(email.id);
   };
-
-  const currentStatus = email.kanbanStatus || 'INBOX';
-  const statusLabel =
-    STATUS_OPTIONS.find((opt) => opt.value === currentStatus)?.label || 'INBOX';
 
   //Render
   return (
@@ -183,11 +156,11 @@ export function KanbanCard({
       )}
       onClick={handleOpen}
     >
-      <div className="p-3 md:p-4 space-y-2.5 md:space-y-3">
+      <div className="p-2 md:p-2.5 space-y-1.5 md:space-y-2">
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Avatar className="size-8 shrink-0">
+            <Avatar className="size-7 shrink-0">
               <AvatarImage src={senderEmail} alt={senderName} />
               <AvatarFallback
                 className={cn(
@@ -216,12 +189,12 @@ export function KanbanCard({
             <Button
               variant="ghost"
               size="icon"
-              className="size-7 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+              className="size-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
               onClick={handleStar}
             >
               <Star
                 className={cn(
-                  'size-4',
+                  'size-3.5',
                   email.isStarred && 'fill-yellow-500 text-yellow-500'
                 )}
               />
@@ -231,10 +204,10 @@ export function KanbanCard({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="size-7 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                  className="size-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
                   onClick={(e) => e.stopPropagation()}
                 >
-                  <MoreVertical className="size-4" />
+                  <MoreVertical className="size-3.5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
@@ -265,15 +238,15 @@ export function KanbanCard({
 
         {/* Subject */}
         <div>
-          <h4 className="text-sm font-semibold line-clamp-2 mb-1">
+          <h4 className="text-xs font-semibold line-clamp-2 mb-0.5">
             {email.subject || '(No Subject)'}
           </h4>
         </div>
 
         {/* AI Summary */}
         {email.aiSummary && (
-          <div className="bg-gradient-to-br from-muted/60 to-muted/40 rounded-lg p-3 border border-border/50">
-            <div className="flex items-center justify-between gap-1.5 mb-1.5">
+          <div className="bg-gradient-to-br from-muted/60 to-muted/40 rounded-lg p-2 border border-border/50">
+            <div className="flex items-center justify-between gap-1.5 mb-1">
               <div className="flex items-center gap-1.5">
                 <div className="size-1.5 rounded-full bg-primary"></div>
                 <span className="text-xs font-semibold text-foreground">
@@ -309,7 +282,7 @@ export function KanbanCard({
               <Button
                 variant="outline"
                 size="sm"
-                className="mt-2 w-full text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                className="mt-1.5 w-full text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                 onClick={handleGenerateSummary}
                 disabled={isGeneratingSummary}
               >
@@ -342,32 +315,6 @@ export function KanbanCard({
               </Badge>
             )}
           </div>
-          {onStatusChange && (
-            <div onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-              <Select value={currentStatus} onValueChange={handleStatusChange}>
-                <SelectTrigger
-                  size="sm"
-                  className="h-7 text-xs w-[120px] opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                >
-                  <SelectValue>{statusLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent
-                  onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                >
-                  {STATUS_OPTIONS.map((option) => (
-                    <SelectItem
-                      key={option.value}
-                      value={option.value}
-                      onClick={(e: React.MouseEvent) => e.stopPropagation()}
-                    >
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
         </div>
       </div>
     </Card>

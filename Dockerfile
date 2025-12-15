@@ -6,9 +6,24 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat curl
 WORKDIR /app
 
+# Configure npm for better network reliability
+RUN npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-timeout 300000 && \
+    npm config set registry https://registry.npmjs.org/
+
 # Copy package files
 COPY package.json package-lock.json* ./
-RUN npm ci
+
+# Install dependencies with retry logic
+RUN for i in 1 2 3; do \
+        echo "Attempt $i: Running npm ci..."; \
+        npm ci --prefer-offline --no-audit && exit 0 || \
+        (echo "Attempt $i failed, waiting 10 seconds..." && sleep 10); \
+    done; \
+    echo "npm ci failed after 3 attempts, trying npm install..."; \
+    npm install --prefer-offline --no-audit --legacy-peer-deps
 
 # Rebuild the source code only when needed
 FROM base AS builder

@@ -5,6 +5,10 @@ import KanbanService, {
   IAddEmailToKanbanRequest,
   IMoveEmailRequest,
   ISnoozeEmailRequest,
+  IGmailStatusResponse,
+  IKanbanSyncResult,
+  ICreateColumnRequest,
+  IUpdateColumnRequest,
 } from '@/services/kanban.service';
 import {
   useQuery,
@@ -152,7 +156,11 @@ export const useMoveEmailMutation = () => {
       KanbanService.moveEmail(request),
     onSuccess: () => {
       // Invalidate board query to refresh all columns
-      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
+      // Use invalidateQueries with exact match to prevent unnecessary refetches
+      queryClient.invalidateQueries({
+        queryKey: kanbanQueryKeys.board(),
+        exact: true,
+      });
     },
   });
 };
@@ -195,10 +203,14 @@ export const useGenerateSummaryMutation = () => {
   return useMutation({
     mutationFn: (emailId: string) => KanbanService.generateSummary(emailId),
     onSuccess: (data, emailId) => {
-      // Invalidate board and specific email status
-      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
+      // Invalidate board and specific email status with exact match
+      queryClient.invalidateQueries({
+        queryKey: kanbanQueryKeys.board(),
+        exact: true,
+      });
       queryClient.invalidateQueries({
         queryKey: kanbanQueryKeys.emailStatus(emailId),
+        exact: true,
       });
     },
   });
@@ -213,6 +225,118 @@ export const useRemoveEmailFromKanbanMutation = () => {
   return useMutation({
     mutationFn: (emailId: string) =>
       KanbanService.removeEmailFromKanban(emailId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
+      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.columns() });
+    },
+  });
+};
+
+/**
+ * Check Gmail connection status query
+ */
+export const useGmailStatusQuery = (
+  options?: Omit<
+    UseQueryOptions<IGmailStatusResponse, AxiosError>,
+    'queryKey' | 'queryFn'
+  >
+) => {
+  return useQuery({
+    queryKey: [...kanbanQueryKeys.all, 'gmail-status'] as const,
+    queryFn: async () => {
+      const response = await KanbanService.getGmailStatus();
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to check Gmail status');
+    },
+    ...options,
+  });
+};
+
+/**
+ * Sync Gmail emails mutation
+ */
+export const useSyncGmailMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation<IKanbanSyncResult, AxiosError, number>({
+    mutationFn: async (maxEmails: number = 50) => {
+      const response = await KanbanService.syncGmail(maxEmails);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to sync Gmail');
+    },
+    onSuccess: () => {
+      // Invalidate board query to refetch
+      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
+    },
+  });
+};
+
+/**
+ * Create column mutation
+ */
+export const useCreateColumnMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (request: ICreateColumnRequest) => {
+      const response = await KanbanService.createColumn(request);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to create column');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
+      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.columns() });
+    },
+  });
+};
+
+/**
+ * Update column mutation
+ */
+export const useUpdateColumnMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      columnId,
+      request,
+    }: {
+      columnId: string;
+      request: IUpdateColumnRequest;
+    }) => {
+      const response = await KanbanService.updateColumn(columnId, request);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to update column');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
+      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.columns() });
+    },
+  });
+};
+
+/**
+ * Delete column mutation
+ */
+export const useDeleteColumnMutation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (columnId: string) => {
+      const response = await KanbanService.deleteColumn(columnId);
+      if (response.data.success) {
+        return;
+      }
+      throw new Error(response.data.message || 'Failed to delete column');
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
       queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.columns() });

@@ -123,6 +123,7 @@ export interface IEmailAttachment {
 
 export type KanbanStatus =
   | 'INBOX'
+  | 'BACKLOG'
   | 'TODO'
   | 'IN_PROGRESS'
   | 'DONE'

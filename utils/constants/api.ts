@@ -44,7 +44,12 @@ export const EMAIL_ENDPOINTS = {
 // Kanban endpoints
 export const KANBAN_ENDPOINTS = {
   GET_BOARD: '/api/kanban/board',
+  SYNC_GMAIL: '/api/kanban/sync',
+  GMAIL_STATUS: '/api/kanban/gmail-status',
   GET_COLUMNS: '/api/kanban/columns',
+  CREATE_COLUMN: '/api/kanban/columns',
+  UPDATE_COLUMN: (columnId: string) => `/api/kanban/columns/${columnId}`,
+  DELETE_COLUMN: (columnId: string) => `/api/kanban/columns/${columnId}`,
   GET_EMAILS_IN_COLUMN: (columnId: string) =>
     `/api/kanban/columns/${columnId}/emails`,
   ADD_EMAIL: '/api/kanban/emails',
@@ -54,7 +59,7 @@ export const KANBAN_ENDPOINTS = {
   SNOOZE_EMAIL: '/api/kanban/emails/snooze',
   UNSNOOZE_EMAIL: (emailId: string) => `/api/kanban/emails/${emailId}/unsnooze`,
   GENERATE_SUMMARY: (emailId: string) =>
-    `/api/kanban/emails/${emailId}/summary`,
+    `/api/kanban/emails/${emailId}/summarize`,
 } as const;
 
 // Health check endpoint

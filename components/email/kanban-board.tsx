@@ -18,11 +18,13 @@ import {
 
 import { KanbanColumn } from './kanban-column';
 import { KanbanCard } from './kanban-card';
-import { IEmailListItem, KanbanStatus } from '@/types/api.types';
+import { IEmailListItem } from '@/types/api.types';
+import { IKanbanColumn } from '@/services/kanban.service';
 
 export interface KanbanBoardProps {
-  emails: IEmailListItem[];
-  onStatusChange?: (emailId: string, newStatus: KanbanStatus) => void;
+  columns: IKanbanColumn[];
+  emailsByColumn: Record<string, IEmailListItem[]>;
+  onMoveEmail?: (emailId: string, targetColumnId: string) => void;
   onCardClick?: (email: IEmailListItem) => void;
   onCardSnooze?: (email: IEmailListItem) => void;
   onCardStar?: (emailId: string, starred: boolean) => void;
@@ -30,17 +32,10 @@ export interface KanbanBoardProps {
   generatingSummaryIds?: Set<string>;
 }
 
-const COLUMNS: Array<{ id: KanbanStatus; title: string }> = [
-  { id: 'INBOX', title: 'INBOX' },
-  { id: 'TODO', title: 'TO DO' },
-  { id: 'IN_PROGRESS', title: 'IN PROGRESS' },
-  { id: 'DONE', title: 'DONE' },
-  { id: 'SNOOZED', title: 'SNOOZED' },
-];
-
 export function KanbanBoard({
-  emails,
-  onStatusChange,
+  columns,
+  emailsByColumn,
+  onMoveEmail,
   onCardClick,
   onCardSnooze,
   onCardStar,
@@ -59,27 +54,10 @@ export function KanbanBoard({
     })
   );
 
-  // Group emails by status
-  const emailsByStatus = React.useMemo(() => {
-    const grouped: Record<KanbanStatus, IEmailListItem[]> = {
-      INBOX: [],
-      TODO: [],
-      IN_PROGRESS: [],
-      DONE: [],
-      SNOOZED: [],
-    };
-
-    emails.forEach((email) => {
-      const status = email.kanbanStatus || 'INBOX';
-      if (grouped[status]) {
-        grouped[status].push(email);
-      } else {
-        grouped.INBOX.push(email);
-      }
-    });
-
-    return grouped;
-  }, [emails]);
+  // Get all emails for finding active email
+  const allEmails = React.useMemo(() => {
+    return Object.values(emailsByColumn).flat();
+  }, [emailsByColumn]);
 
   //Init event handle
   const handleDragStart = (event: DragStartEvent) => {
@@ -95,19 +73,27 @@ export function KanbanBoard({
     }
 
     const emailId = active.id as string;
-    const newStatus = over.id as KanbanStatus;
+    const targetColumnId = over.id as string;
 
     // Find the email
-    const email = emails.find((e) => e.id === emailId);
+    const email = allEmails.find((e) => e.id === emailId);
     if (!email) {
       setActiveId(null);
       return;
     }
 
-    // Check if status actually changed
-    const currentStatus = email.kanbanStatus || 'INBOX';
-    if (currentStatus !== newStatus) {
-      onStatusChange?.(emailId, newStatus);
+    // Find source and target columns
+    let sourceColumnId: string | null = null;
+    for (const [colId, emails] of Object.entries(emailsByColumn)) {
+      if (emails.some((e) => e.id === emailId)) {
+        sourceColumnId = colId;
+        break;
+      }
+    }
+
+    // Check if column actually changed
+    if (sourceColumnId && sourceColumnId !== targetColumnId) {
+      onMoveEmail?.(emailId, targetColumnId);
     }
 
     setActiveId(null);
@@ -115,8 +101,8 @@ export function KanbanBoard({
 
   const activeEmail = React.useMemo(() => {
     if (!activeId) return null;
-    return emails.find((e) => e.id === activeId) || null;
-  }, [activeId, emails]);
+    return allEmails.find((e) => e.id === activeId) || null;
+  }, [activeId, allEmails]);
 
   //Init ref for horizontal scroll
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -166,8 +152,8 @@ export function KanbanBoard({
           scrollbarColor: 'hsl(var(--border)) hsl(var(--muted))',
         }}
       >
-        {COLUMNS.map((column) => {
-          const columnEmails = emailsByStatus[column.id] || [];
+        {columns.map((column) => {
+          const columnEmails = emailsByColumn[column.id] || [];
           return (
             <SortableContext
               key={column.id}
@@ -177,12 +163,13 @@ export function KanbanBoard({
             >
               <KanbanColumn
                 id={column.id}
-                title={column.title}
+                title={column.name}
                 emails={columnEmails}
+                count={column.emailCount}
+                color={column.color}
                 onCardClick={onCardClick}
                 onCardSnooze={onCardSnooze}
                 onCardStar={onCardStar}
-                onCardStatusChange={onStatusChange}
                 onCardGenerateSummary={onCardGenerateSummary}
                 generatingSummaryIds={generatingSummaryIds}
               />

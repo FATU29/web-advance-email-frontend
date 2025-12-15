@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { List } from 'lucide-react';
+import { List, RefreshCw } from 'lucide-react';
 
 import { Sidebar } from '@/components/email/sidebar';
 import { EmailDetail } from '@/components/email/email-detail';
@@ -31,226 +31,20 @@ import {
   useEmailsInfiniteQuery,
   useEmailQuery,
   useToggleEmailStarMutation,
-  useUpdateKanbanStatusMutation,
-  useSnoozeEmailMutation,
 } from '@/hooks/use-email-mutations';
 import {
   useKanbanBoardQuery,
   useGenerateSummaryMutation,
   useMoveEmailMutation,
   useSnoozeEmailKanbanMutation,
+  useUnsnoozeEmailMutation,
+  useGmailStatusQuery,
+  useSyncGmailMutation,
 } from '@/hooks/use-kanban-mutations';
 import { IEmailListItem, KanbanStatus } from '@/types/api.types';
+import { cn } from '@/lib/utils';
 
-//==================== REGION MOCK DATA ====================
-// Set to true to use mock data instead of API
-const USE_MOCK_DATA = true;
-
-// Fixed dates to prevent hydration mismatch
-const MOCK_BASE_DATE = '2024-01-15T10:00:00.000Z';
-
-const MOCK_MAILBOXES = [
-  {
-    id: 'mock-inbox',
-    name: 'Inbox',
-    type: 'INBOX' as const,
-    unreadCount: 5,
-    totalCount: 15,
-    createdAt: MOCK_BASE_DATE,
-    updatedAt: MOCK_BASE_DATE,
-  },
-];
-
-const generateMockEmails = (): IEmailListItem[] => {
-  const baseTime = new Date(MOCK_BASE_DATE).getTime();
-
-  const mockEmails: IEmailListItem[] = [
-    // INBOX emails
-    {
-      id: 'email-1',
-      from: 'john.doe@example.com',
-      fromName: 'John Doe',
-      subject: 'Welcome to our new email system',
-      preview:
-        'Thank you for joining us. We are excited to have you on board...',
-      isRead: false,
-      isStarred: false,
-      isImportant: true,
-      hasAttachments: false,
-      receivedAt: new Date(baseTime - 2 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'INBOX',
-      aiSummary: 'Welcome email with onboarding information',
-    },
-    {
-      id: 'email-2',
-      from: 'sarah.smith@company.com',
-      fromName: 'Sarah Smith',
-      subject: 'Meeting scheduled for next week',
-      preview:
-        'Hi, I would like to schedule a meeting to discuss the project...',
-      isRead: false,
-      isStarred: true,
-      isImportant: false,
-      hasAttachments: true,
-      receivedAt: new Date(baseTime - 5 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'INBOX',
-      aiSummary: 'Meeting request for project discussion',
-    },
-    {
-      id: 'email-3',
-      from: 'support@service.com',
-      fromName: 'Support Team',
-      subject: 'Your ticket #1234 has been resolved',
-      preview:
-        'We have successfully resolved your issue. Please let us know if you need any further assistance...',
-      isRead: true,
-      isStarred: false,
-      isImportant: false,
-      hasAttachments: false,
-      receivedAt: new Date(baseTime - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'INBOX',
-    },
-
-    // TODO emails
-    {
-      id: 'email-4',
-      from: 'manager@company.com',
-      fromName: 'Project Manager',
-      subject: 'Review the quarterly report',
-      preview:
-        'Please review the Q4 report and provide your feedback by Friday...',
-      isRead: true,
-      isStarred: true,
-      isImportant: true,
-      hasAttachments: true,
-      receivedAt: new Date(baseTime - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'TODO',
-      aiSummary: 'Action required: Review Q4 report by Friday',
-    },
-    {
-      id: 'email-5',
-      from: 'hr@company.com',
-      fromName: 'HR Department',
-      subject: 'Update your profile information',
-      preview:
-        'Please update your profile information in the employee portal...',
-      isRead: false,
-      isStarred: false,
-      isImportant: false,
-      hasAttachments: false,
-      receivedAt: new Date(baseTime - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'TODO',
-    },
-    {
-      id: 'email-6',
-      from: 'finance@company.com',
-      fromName: 'Finance Team',
-      subject: 'Expense report approval needed',
-      preview:
-        'Your expense report for March is pending approval. Please review and submit...',
-      isRead: true,
-      isStarred: false,
-      isImportant: true,
-      hasAttachments: true,
-      receivedAt: new Date(baseTime - 4 * 24 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'TODO',
-    },
-
-    // IN_PROGRESS emails
-    {
-      id: 'email-7',
-      from: 'client@clientcompany.com',
-      fromName: 'Client Name',
-      subject: 'Project proposal feedback',
-      preview:
-        'I have reviewed the proposal and have some questions. Let me know when we can discuss...',
-      isRead: true,
-      isStarred: true,
-      isImportant: true,
-      hasAttachments: false,
-      receivedAt: new Date(baseTime - 1 * 24 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'IN_PROGRESS',
-      aiSummary: 'Client feedback on project proposal - needs discussion',
-    },
-    {
-      id: 'email-8',
-      from: 'developer@team.com',
-      fromName: 'Dev Team Lead',
-      subject: 'Code review request',
-      preview:
-        'Please review the pull request #456. It includes the new feature implementation...',
-      isRead: true,
-      isStarred: false,
-      isImportant: false,
-      hasAttachments: false,
-      receivedAt: new Date(baseTime - 6 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'IN_PROGRESS',
-    },
-
-    // DONE emails
-    {
-      id: 'email-9',
-      from: 'noreply@system.com',
-      fromName: 'System Notification',
-      subject: 'Your password has been changed',
-      preview:
-        'This is a confirmation that your password was successfully changed...',
-      isRead: true,
-      isStarred: false,
-      isImportant: false,
-      hasAttachments: false,
-      receivedAt: new Date(baseTime - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'DONE',
-    },
-    {
-      id: 'email-10',
-      from: 'newsletter@blog.com',
-      fromName: 'Tech Blog Newsletter',
-      subject: 'Weekly tech news roundup',
-      preview: 'Here are the top tech news stories from this week...',
-      isRead: true,
-      isStarred: false,
-      isImportant: false,
-      hasAttachments: false,
-      receivedAt: new Date(baseTime - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'DONE',
-    },
-    {
-      id: 'email-11',
-      from: 'vendor@supplier.com',
-      fromName: 'Vendor Support',
-      subject: 'Order confirmation #ORD-12345',
-      preview:
-        'Your order has been confirmed and will be shipped within 2-3 business days...',
-      isRead: true,
-      isStarred: false,
-      isImportant: false,
-      hasAttachments: true,
-      receivedAt: new Date(baseTime - 10 * 24 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'DONE',
-    },
-
-    // SNOOZED emails
-    {
-      id: 'email-12',
-      from: 'reminder@calendar.com',
-      fromName: 'Calendar Reminder',
-      subject: 'Team building event next month',
-      preview:
-        'Just a reminder about the team building event scheduled for next month...',
-      isRead: true,
-      isStarred: false,
-      isImportant: false,
-      hasAttachments: false,
-      receivedAt: new Date(baseTime - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      kanbanStatus: 'SNOOZED',
-      snoozeUntil: new Date(baseTime + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-  ];
-
-  return mockEmails;
-};
-//====================================================
+// Mock data removed - using real Gmail API data only
 
 export default function KanbanPage() {
   const router = useRouter();
@@ -271,6 +65,7 @@ export default function KanbanPage() {
   const [generatingSummaryIds, setGeneratingSummaryIds] = React.useState<
     Set<string>
   >(new Set());
+  const [isSyncing, setIsSyncing] = React.useState(false);
 
   //Init effect hook - Prevent hydration mismatch with @dnd-kit
   React.useEffect(() => {
@@ -279,54 +74,65 @@ export default function KanbanPage() {
 
   // Fetch mailboxes
   const { data: mailboxesData = [] } = useMailboxesQuery({
-    enabled: !USE_MOCK_DATA,
+    enabled: true, // Always enabled - using real API
   });
 
-  // Use mock mailboxes if enabled
+  // Use mailboxes from API
   const mailboxes = React.useMemo(() => {
-    return USE_MOCK_DATA ? MOCK_MAILBOXES : mailboxesData;
+    return mailboxesData || [];
   }, [mailboxesData]);
 
-  // Find INBOX mailbox
+  // Find INBOX mailbox - must use real Gmail label ID "INBOX"
   const inboxMailbox = React.useMemo(() => {
-    return mailboxes.find((m) => m.type === 'INBOX') || mailboxes[0];
+    // Find mailbox with type INBOX or ID "INBOX" (Gmail label ID)
+    return (
+      mailboxes.find((m) => m.type === 'INBOX' || m.id === 'INBOX') ||
+      mailboxes[0]
+    );
   }, [mailboxes]);
 
-  // Fetch Kanban board data
-  const {
-    data: kanbanBoardData,
-    isLoading: kanbanLoading,
-    refetch: refetchKanbanBoard,
-  } = useKanbanBoardQuery({
-    enabled: !USE_MOCK_DATA,
-  });
+  // Check Gmail connection status
+  const { data: gmailStatus, isLoading: gmailStatusLoading } =
+    useGmailStatusQuery({
+      enabled: true,
+      refetchOnWindowFocus: false,
+    });
 
-  // Fetch emails with infinite scroll (fallback for mock data)
-  const { data: emailsData, isLoading: emailsLoading } = useEmailsInfiniteQuery(
-    inboxMailbox?.id || '',
+  // Fetch Kanban board data
+  const { data: kanbanBoardData, isLoading: kanbanLoading } =
+    useKanbanBoardQuery({
+      enabled: true, // Always enabled - using real API
+      refetchOnWindowFocus: false,
+      refetchOnMount: true,
+      refetchInterval: false, // Disable auto-refetch to prevent spam
+    });
+
+  // Sync mutation
+  const syncGmailMutation = useSyncGmailMutation();
+
+  // Fetch emails with infinite scroll (disabled - using Kanban API instead)
+  // Note: This query is disabled and should not make any API calls
+  // Only keeping it for potential future use, but it should never run
+  const { isLoading: emailsLoading } = useEmailsInfiniteQuery(
+    inboxMailbox?.id || 'INBOX', // Use 'INBOX' as fallback (Gmail label ID)
     50,
     {
-      enabled: !!inboxMailbox?.id && USE_MOCK_DATA,
+      enabled: false, // Disabled - using Kanban API instead
     }
   );
 
   // Convert Kanban board data to IEmailListItem format
-  const emails = React.useMemo(() => {
-    if (USE_MOCK_DATA) {
-      return generateMockEmails();
-    }
-    if (!kanbanBoardData) return [];
+  const emailsByColumn = React.useMemo((): Record<string, IEmailListItem[]> => {
+    if (!kanbanBoardData) return {};
 
-    // Flatten emails from all columns
-    const allEmails: IEmailListItem[] = [];
+    const converted: Record<string, IEmailListItem[]> = {};
     Object.entries(kanbanBoardData.emailsByColumn).forEach(
       ([columnId, kanbanEmails]) => {
-        kanbanEmails.forEach((kanbanEmail) => {
-          // Find column to get status
+        converted[columnId] = kanbanEmails.map((kanbanEmail) => {
           const column = kanbanBoardData.columns.find((c) => c.id === columnId);
           const status = column?.type as KanbanStatus | undefined;
 
-          allEmails.push({
+          return {
             id: kanbanEmail.emailId,
             from: kanbanEmail.fromEmail,
             fromName: kanbanEmail.fromName,
@@ -334,25 +140,23 @@ export default function KanbanPage() {
             preview: kanbanEmail.preview,
             isRead: kanbanEmail.isRead,
             isStarred: kanbanEmail.isStarred,
-            isImportant: false, // Not available in Kanban response
-            hasAttachments: false, // Not available in Kanban response
+            isImportant: false,
+            hasAttachments: false,
             receivedAt: kanbanEmail.receivedAt,
             kanbanStatus: status,
             snoozeUntil: kanbanEmail.snoozeUntil,
             aiSummary: kanbanEmail.summary || undefined,
-          });
+          };
         });
       }
     );
-
-    return allEmails;
+    return converted;
   }, [kanbanBoardData]);
 
-  // Fetch AI summaries for emails that don't have them
-  // Note: AI summaries should be fetched from the backend when needed
-  // const emailsWithoutSummary = React.useMemo(() => {
-  //   return emails.filter((e) => !e.aiSummary && e.preview);
-  // }, [emails]);
+  // Flatten emails from all columns for other uses
+  const emails = React.useMemo(() => {
+    return Object.values(emailsByColumn).flat();
+  }, [emailsByColumn]);
 
   // Fetch selected email detail
   const { data: selectedEmail } = useEmailQuery(selectedEmailId || '', {
@@ -361,14 +165,18 @@ export default function KanbanPage() {
 
   // Mutations
   const toggleStarMutation = useToggleEmailStarMutation();
-  const updateKanbanStatusMutation = useUpdateKanbanStatusMutation();
-  const snoozeEmailMutation = useSnoozeEmailMutation();
   const moveEmailMutation = useMoveEmailMutation();
   const snoozeEmailKanbanMutation = useSnoozeEmailKanbanMutation();
+  const unsnoozeEmailMutation = useUnsnoozeEmailMutation();
   const generateSummaryMutation = useGenerateSummaryMutation();
 
   // Check for expired snoozes and restore them
   React.useEffect(() => {
+    // Skip if no emails
+    if (emails.length === 0 || !kanbanBoardData) {
+      return;
+    }
+
     const checkSnoozes = () => {
       const now = new Date();
       const expiredSnoozes = emails.filter(
@@ -378,75 +186,83 @@ export default function KanbanPage() {
           new Date(email.snoozeUntil) <= now
       );
 
-      expiredSnoozes.forEach((email) => {
-        updateKanbanStatusMutation.mutate(
-          {
-            emailId: email.id,
-            status: 'INBOX',
-          },
-          {
-            onSuccess: () => {
-              toast.success(`Email "${email.subject}" restored to inbox`);
-            },
-          }
-        );
-      });
-    };
-
-    // Check immediately
-    checkSnoozes();
-
-    // Check every minute
-    const interval = setInterval(checkSnoozes, 60000);
-
-    return () => clearInterval(interval);
-  }, [emails, updateKanbanStatusMutation]);
-
-  //Init event handle
-  const handleStatusChange = (emailId: string, newStatus: KanbanStatus) => {
-    if (USE_MOCK_DATA) {
-      // For mock data, use the old mutation
-      updateKanbanStatusMutation.mutate(
-        { emailId, status: newStatus },
-        {
-          onSuccess: () => {
-            toast.success('Email moved successfully');
-          },
-          onError: (error) => {
-            toast.error(
-              error instanceof Error ? error.message : 'Failed to move email'
-            );
-          },
-        }
-      );
-    } else {
-      // For real data, use Kanban move mutation
-      // Find the target column ID
-      const targetColumn = kanbanBoardData?.columns.find(
-        (c) => c.type === newStatus
-      );
-      if (!targetColumn) {
-        toast.error('Target column not found');
+      // Only process if there are expired snoozes
+      if (expiredSnoozes.length === 0) {
         return;
       }
 
-      moveEmailMutation.mutate(
-        {
-          emailId,
-          targetColumnId: targetColumn.id,
-        },
-        {
+      // Process expired snoozes one by one to avoid spam
+      // Use unsnooze mutation to restore to previous column
+      expiredSnoozes.forEach((email) => {
+        unsnoozeEmailMutation.mutate(email.id, {
           onSuccess: () => {
-            toast.success('Email moved successfully');
-            refetchKanbanBoard();
+            toast.success(`Email "${email.subject}" restored`);
+            // Query will be invalidated automatically by mutation
           },
-          onError: (error) => {
-            toast.error(
-              error instanceof Error ? error.message : 'Failed to move email'
+          onError: (_error) => {
+            // If unsnooze fails, try moving to inbox as fallback
+            const targetColumn = kanbanBoardData?.columns.find(
+              (c) => c.type === 'INBOX'
             );
+            if (targetColumn) {
+              moveEmailMutation.mutate(
+                {
+                  emailId: email.id,
+                  targetColumnId: targetColumn.id,
+                },
+                {
+                  onSuccess: () => {
+                    toast.success(`Email "${email.subject}" restored to inbox`);
+                  },
+                }
+              );
+            }
           },
-        }
+        });
+      });
+    };
+
+    // Check every minute (not immediately to avoid spam on mount)
+    const interval = setInterval(checkSnoozes, 60000);
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emails.length]); // Only depend on emails.length to prevent infinite loops
+
+  //Init event handle
+  const handleMoveEmail = (emailId: string, targetColumnId: string) => {
+    moveEmailMutation.mutate(
+      {
+        emailId,
+        targetColumnId,
+      },
+      {
+        onSuccess: () => {
+          toast.success('Email moved successfully');
+          // Query will be invalidated automatically by mutation
+        },
+        onError: (error) => {
+          toast.error(
+            error instanceof Error ? error.message : 'Failed to move email'
+          );
+        },
+      }
+    );
+  };
+
+  const handleSyncGmail = async () => {
+    setIsSyncing(true);
+    try {
+      const result = await syncGmailMutation.mutateAsync(50);
+      toast.success(
+        `Synced ${result.synced} emails (${result.skipped} already in Kanban)`
       );
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to sync Gmail'
+      );
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -462,42 +278,24 @@ export default function KanbanPage() {
   const handleSnoozeConfirm = (snoozeUntil: string) => {
     if (!emailToSnooze) return;
 
-    if (USE_MOCK_DATA) {
-      snoozeEmailMutation.mutate(
-        {
-          emailId: emailToSnooze.id,
-          snoozeUntil,
+    // Use Kanban snooze mutation
+    snoozeEmailKanbanMutation.mutate(
+      {
+        emailId: emailToSnooze.id,
+        snoozeUntil,
+      },
+      {
+        onSuccess: () => {
+          toast.success('Email snoozed successfully');
+          // Query will be invalidated automatically by mutation
         },
-        {
-          onSuccess: () => {
-            toast.success('Email snoozed successfully');
-          },
-          onError: (error) => {
-            toast.error(
-              error instanceof Error ? error.message : 'Failed to snooze email'
-            );
-          },
-        }
-      );
-    } else {
-      snoozeEmailKanbanMutation.mutate(
-        {
-          emailId: emailToSnooze.id,
-          snoozeUntil,
+        onError: (error) => {
+          toast.error(
+            error instanceof Error ? error.message : 'Failed to snooze email'
+          );
         },
-        {
-          onSuccess: () => {
-            toast.success('Email snoozed successfully');
-            refetchKanbanBoard();
-          },
-          onError: (error) => {
-            toast.error(
-              error instanceof Error ? error.message : 'Failed to snooze email'
-            );
-          },
-        }
-      );
-    }
+      }
+    );
   };
 
   const handleGenerateSummary = (emailId: string) => {
@@ -506,7 +304,7 @@ export default function KanbanPage() {
     generateSummaryMutation.mutate(emailId, {
       onSuccess: () => {
         toast.success('Summary generated successfully');
-        refetchKanbanBoard();
+        // Query will be invalidated automatically by mutation
         setGeneratingSummaryIds((prev) => {
           const next = new Set(prev);
           next.delete(emailId);
@@ -693,28 +491,10 @@ export default function KanbanPage() {
   }
 
   return (
-    <div className="flex h-screen">
-      {!isMobile && (
-        <Sidebar
-          mailboxes={mailboxes}
-          activeFolder={inboxMailbox.id}
-          user={
-            user
-              ? {
-                  id: user.id,
-                  name: user.name,
-                  email: user.email,
-                  avatar: user.profilePicture || undefined,
-                }
-              : undefined
-          }
-          onLogoutClick={logout}
-          onItemClick={(folder) => router.push(`/mail/${folder}`)}
-        />
-      )}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="border-b p-4 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+    <div className="flex h-screen flex-col">
+      {/* Header with Navigation */}
+      <div className="border-b px-4 py-3 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
+        <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
             <h1 className="text-xl font-semibold">Kanban Board</h1>
             {(kanbanLoading || emailsLoading) && (
@@ -726,53 +506,81 @@ export default function KanbanPage() {
                 {visibleEmails.length !== 1 ? 's' : ''}
               </span>
             )}
+            {/* Gmail Status Badge */}
+            {gmailStatusLoading ? (
+              <span className="text-xs text-muted-foreground">
+                Checking Gmail...
+              </span>
+            ) : gmailStatus?.connected ? (
+              <span className="text-xs text-green-600 flex items-center gap-1 px-2 py-1 rounded-full bg-green-50 dark:bg-green-950">
+                ✓ Gmail Connected
+              </span>
+            ) : (
+              <span className="text-xs text-orange-600 flex items-center gap-1 px-2 py-1 rounded-full bg-orange-50 dark:bg-orange-950">
+                ⚠️ Gmail not connected
+              </span>
+            )}
           </div>
-          <Button variant="outline" onClick={handleToggleView}>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleSyncGmail}
+            disabled={isSyncing || !gmailStatus?.connected || kanbanLoading}
+          >
+            <RefreshCw
+              className={cn('h-4 w-4 mr-2', isSyncing && 'animate-spin')}
+            />
+            {isSyncing ? 'Syncing...' : 'Sync Gmail'}
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleToggleView}>
             <List className="size-4 mr-2" />
-            Switch to List View
+            List View
           </Button>
         </div>
+      </div>
 
-        {/* Kanban Board */}
-        <div className="flex-1 overflow-hidden p-4 md:p-6">
-          {!isMounted ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center space-y-2">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground">Loading...</p>
-              </div>
+      {/* Kanban Board */}
+      <div className="flex-1 overflow-hidden p-4 md:p-6">
+        {!isMounted ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center space-y-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground">Loading...</p>
             </div>
-          ) : kanbanLoading || emailsLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center space-y-2">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                <p className="text-muted-foreground">Loading emails...</p>
-              </div>
+          </div>
+        ) : kanbanLoading || emailsLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center space-y-2">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+              <p className="text-muted-foreground">Loading emails...</p>
             </div>
-          ) : visibleEmails.length === 0 ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="text-center space-y-2">
-                <p className="text-muted-foreground">No emails found</p>
-                <Button
-                  variant="outline"
-                  onClick={() => router.push('/mail/inbox')}
-                >
-                  Go to Inbox
-                </Button>
-              </div>
+          </div>
+        ) : visibleEmails.length === 0 ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center space-y-2">
+              <p className="text-muted-foreground">No emails found</p>
+              <Button
+                variant="outline"
+                onClick={() => router.push('/mail/inbox')}
+              >
+                Go to Inbox
+              </Button>
             </div>
-          ) : (
-            <KanbanBoard
-              emails={visibleEmails}
-              onStatusChange={handleStatusChange}
-              onCardClick={handleCardClick}
-              onCardSnooze={handleSnooze}
-              onCardStar={handleStar}
-              onCardGenerateSummary={handleGenerateSummary}
-              generatingSummaryIds={generatingSummaryIds}
-            />
-          )}
-        </div>
+          </div>
+        ) : kanbanBoardData ? (
+          <KanbanBoard
+            columns={kanbanBoardData.columns}
+            emailsByColumn={emailsByColumn}
+            onMoveEmail={handleMoveEmail}
+            onCardClick={handleCardClick}
+            onCardSnooze={handleSnooze}
+            onCardStar={handleStar}
+            onCardGenerateSummary={handleGenerateSummary}
+            generatingSummaryIds={generatingSummaryIds}
+          />
+        ) : null}
       </div>
 
       {/* Snooze Dialog */}
