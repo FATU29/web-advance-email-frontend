@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import {
   Clock,
   ExternalLink,
+  Maximize2,
   MoreVertical,
   Star,
   Sparkles,
@@ -22,6 +23,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { IEmailListItem } from '@/types/api.types';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +52,9 @@ export function KanbanCard({
   onGenerateSummary,
   isGeneratingSummary = false,
 }: KanbanCardProps) {
+  //Init state
+  const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+
   //Init use hook
   const {
     attributes,
@@ -245,28 +258,79 @@ export function KanbanCard({
 
         {/* AI Summary */}
         {email.aiSummary && (
-          <div className="bg-gradient-to-br from-muted/60 to-muted/40 rounded-lg p-2 border border-border/50">
+          <div className="bg-linear-to-br from-muted/60 to-muted/40 rounded-lg p-2 border border-border/50 max-w-full overflow-hidden">
             <div className="flex items-center justify-between gap-1.5 mb-1">
-              <div className="flex items-center gap-1.5">
-                <div className="size-1.5 rounded-full bg-primary"></div>
-                <span className="text-xs font-semibold text-foreground">
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <div className="size-1.5 rounded-full bg-primary shrink-0"></div>
+                <span className="text-xs font-semibold text-foreground truncate">
                   AI Summary
                 </span>
               </div>
-              {onGenerateSummary && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-5 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={handleGenerateSummary}
-                  disabled={isGeneratingSummary}
-                  title="Regenerate summary"
-                >
-                  <Sparkles className="size-3" />
-                </Button>
-              )}
+              <div className="flex items-center gap-1 shrink-0">
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-5 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsDialogOpen(true);
+                      }}
+                      title="View full summary"
+                    >
+                      <Maximize2 className="size-3" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[80vh]">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Sparkles className="size-4 text-primary" />
+                        AI Summary
+                      </DialogTitle>
+                      <DialogDescription className="text-sm">
+                        <span className="font-semibold">Subject:</span>{' '}
+                        {email.subject || '(No Subject)'}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <ScrollArea className="h-full max-h-[60vh] pr-4">
+                      <div className="space-y-4">
+                        <div className="rounded-lg bg-linear-to-br from-muted/60 to-muted/40 border border-border/50 p-4">
+                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+                            {email.aiSummary}
+                          </p>
+                        </div>
+                        {email.from && (
+                          <div className="text-xs text-muted-foreground">
+                            <span className="font-semibold">From:</span>{' '}
+                            {email.from}
+                          </div>
+                        )}
+                        {email.receivedAt && (
+                          <div className="text-xs text-muted-foreground">
+                            <span className="font-semibold">Received:</span>{' '}
+                            {format(new Date(email.receivedAt), 'PPpp')}
+                          </div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </DialogContent>
+                </Dialog>
+                {onGenerateSummary && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-5 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={handleGenerateSummary}
+                    disabled={isGeneratingSummary}
+                    title="Regenerate summary"
+                  >
+                    <Sparkles className="size-3" />
+                  </Button>
+                )}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">
+            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 wrap-break-word">
               {email.aiSummary}
             </p>
           </div>
