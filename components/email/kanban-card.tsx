@@ -159,16 +159,20 @@ export function KanbanCard({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
       className={cn(
-        'group cursor-grab active:cursor-grabbing transition-all hover:shadow-lg border-2',
+        'group transition-all duration-150 hover:shadow-lg border-2 will-change-transform',
         !email.isRead && 'border-l-4 border-l-primary',
-        isDragging && 'opacity-50 scale-95 shadow-xl',
-        !isDragging && 'hover:scale-[1.02]'
+        isDragging && 'opacity-40 scale-95 shadow-xl rotate-1',
+        !isDragging && 'hover:scale-[1.01]'
       )}
-      onClick={handleOpen}
     >
-      <div className="p-2 md:p-2.5 space-y-1.5 md:space-y-2">
+      <div
+        {...listeners}
+        className={cn(
+          'p-2 md:p-2.5 space-y-1.5 md:space-y-2 cursor-grab active:cursor-grabbing'
+        )}
+        onClick={handleOpen}
+      >
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -201,13 +205,16 @@ export function KanbanCard({
             <Button
               variant="ghost"
               size="icon"
-              className="size-6 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+              className="size-6 opacity-0 group-hover:opacity-100 transition-all hover:bg-muted"
               onClick={handleStar}
+              title={email.isStarred ? 'Unstar email' : 'Star email'}
             >
               <Star
                 className={cn(
-                  'size-3.5',
-                  email.isStarred && 'fill-yellow-500 text-yellow-500'
+                  'size-3.5 transition-all duration-200',
+                  email.isStarred
+                    ? 'fill-yellow-500 text-yellow-500 scale-110'
+                    : 'hover:text-yellow-500'
                 )}
               />
             </Button>

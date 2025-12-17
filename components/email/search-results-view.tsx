@@ -7,23 +7,27 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { SearchBar } from './search-bar';
 import { SearchResultCard } from './search-result-card';
 import { useKanbanSearchQuery } from '@/hooks/use-kanban-search';
+import { useToggleEmailStarMutation } from '@/hooks/use-email-mutations';
 import { IKanbanEmail } from '@/services/kanban.service';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 export interface SearchResultsViewProps {
   onBack: () => void;
   onViewEmail: (emailId: string) => void;
+  onStar?: (emailId: string, starred: boolean) => void;
   className?: string;
 }
 
 export function SearchResultsView({
   onBack,
   onViewEmail,
+  onStar,
   className,
 }: SearchResultsViewProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
   const [activeQuery, setActiveQuery] = React.useState('');
-  const [includeBody, setIncludeBody] = React.useState(false);
+  const [includeBody] = React.useState(false);
 
   const {
     data: searchResults,
@@ -36,6 +40,9 @@ export function SearchResultsView({
     activeQuery.trim() !== ''
   );
 
+  // Use the star mutation hook
+  const toggleStarMutation = useToggleEmailStarMutation();
+
   const handleSearch = (query: string) => {
     setActiveQuery(query);
   };
@@ -47,6 +54,25 @@ export function SearchResultsView({
 
   const handleViewResult = (result: IKanbanEmail) => {
     onViewEmail(result.emailId);
+  };
+
+  const handleStar = (emailId: string, starred: boolean) => {
+    // Call the mutation
+    toggleStarMutation.mutate(
+      { emailId, starred },
+      {
+        onSuccess: () => {
+          toast.success(starred ? 'Email starred' : 'Email unstarred');
+          // Also call the parent callback if provided
+          onStar?.(emailId, starred);
+        },
+        onError: (error) => {
+          toast.error(
+            error instanceof Error ? error.message : 'Failed to toggle star'
+          );
+        },
+      }
+    );
   };
 
   const hasSearched = activeQuery.trim() !== '';
@@ -192,7 +218,11 @@ export function SearchResultsView({
                   className="animate-in fade-in slide-in-from-bottom-2"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <SearchResultCard result={result} onView={handleViewResult} />
+                  <SearchResultCard
+                    result={result}
+                    onView={handleViewResult}
+                    onStar={handleStar}
+                  />
                 </div>
               ))}
             </div>

@@ -566,6 +566,7 @@ export default function KanbanPage() {
         <SearchResultsView
           onBack={handleCloseSearch}
           onViewEmail={handleViewEmailFromSearch}
+          onStar={handleStar}
           className="h-full"
         />
       ) : (

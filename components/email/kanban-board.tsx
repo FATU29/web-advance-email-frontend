@@ -6,15 +6,13 @@ import {
   DragEndEvent,
   DragOverlay,
   DragStartEvent,
+  DragOverEvent,
   PointerSensor,
   useSensor,
   useSensors,
-  closestCorners,
+  closestCenter,
+  DragCancelEvent,
 } from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
 
 import { KanbanColumn } from './kanban-column';
 import { KanbanCard } from './kanban-card';
@@ -49,7 +47,7 @@ export function KanbanBoard({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 5, // 5px - balance between sensitivity and preventing accidental drags
       },
     })
   );
@@ -64,11 +62,22 @@ export function KanbanBoard({
     setActiveId(event.active.id as string);
   };
 
+  const handleDragOver = (_event: DragOverEvent) => {
+    // This handler ensures smooth visual feedback during drag
+    // The actual logic is handled by the droppable zones
+  };
+
+  const handleDragCancel = (_event: DragCancelEvent) => {
+    setActiveId(null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
 
+    // Reset active state
+    setActiveId(null);
+
     if (!over) {
-      setActiveId(null);
       return;
     }
 
@@ -78,11 +87,11 @@ export function KanbanBoard({
     // Find the email
     const email = allEmails.find((e) => e.id === emailId);
     if (!email) {
-      setActiveId(null);
+      console.warn('Email not found:', emailId);
       return;
     }
 
-    // Find source and target columns
+    // Find source column
     let sourceColumnId: string | null = null;
     for (const [colId, emails] of Object.entries(emailsByColumn)) {
       if (emails.some((e) => e.id === emailId)) {
@@ -91,12 +100,14 @@ export function KanbanBoard({
       }
     }
 
-    // Check if column actually changed
+    // Only move if column actually changed
     if (sourceColumnId && sourceColumnId !== targetColumnId) {
+      // Call the move handler - will trigger optimistic update + API call
       onMoveEmail?.(emailId, targetColumnId);
+    } else if (!sourceColumnId) {
+      console.warn('Source column not found for email:', emailId);
     }
-
-    setActiveId(null);
+    // If same column, do nothing (no need to move)
   };
 
   const activeEmail = React.useMemo(() => {
@@ -140,9 +151,11 @@ export function KanbanBoard({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={closestCenter}
       onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
+      onDragCancel={handleDragCancel}
     >
       <div
         ref={scrollContainerRef}
@@ -155,32 +168,31 @@ export function KanbanBoard({
         {columns.map((column) => {
           const columnEmails = emailsByColumn[column.id] || [];
           return (
-            <SortableContext
+            <KanbanColumn
               key={column.id}
               id={column.id}
-              items={columnEmails.map((e) => e.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <KanbanColumn
-                id={column.id}
-                title={column.name}
-                emails={columnEmails}
-                count={column.emailCount}
-                color={column.color}
-                onCardClick={onCardClick}
-                onCardSnooze={onCardSnooze}
-                onCardStar={onCardStar}
-                onCardGenerateSummary={onCardGenerateSummary}
-                generatingSummaryIds={generatingSummaryIds}
-              />
-            </SortableContext>
+              title={column.name}
+              emails={columnEmails}
+              count={column.emailCount}
+              color={column.color}
+              onCardClick={onCardClick}
+              onCardSnooze={onCardSnooze}
+              onCardStar={onCardStar}
+              onCardGenerateSummary={onCardGenerateSummary}
+              generatingSummaryIds={generatingSummaryIds}
+            />
           );
         })}
       </div>
 
-      <DragOverlay>
+      <DragOverlay
+        dropAnimation={{
+          duration: 180,
+          easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+        }}
+      >
         {activeEmail ? (
-          <div className="rotate-2 opacity-95 shadow-xl scale-105">
+          <div className="rotate-2 opacity-90 shadow-2xl scale-105 will-change-transform">
             <KanbanCard
               email={activeEmail}
               onOpen={onCardClick}

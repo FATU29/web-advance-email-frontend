@@ -13,14 +13,32 @@ import { IKanbanEmail } from '@/services/kanban.service';
 export interface SearchResultCardProps {
   result: IKanbanEmail;
   onView?: (result: IKanbanEmail) => void;
+  onStar?: (emailId: string, starred: boolean) => void;
   className?: string;
 }
 
 export function SearchResultCard({
   result,
   onView,
+  onStar,
   className,
 }: SearchResultCardProps) {
+  // Optimistic UI state for star status
+  const [isStarred, setIsStarred] = React.useState(result.isStarred);
+
+  // Update local state when result changes
+  React.useEffect(() => {
+    setIsStarred(result.isStarred);
+  }, [result.isStarred]);
+
+  const handleStarClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Optimistically update UI
+    setIsStarred(!isStarred);
+    // Call the parent handler which will handle the API call
+    onStar?.(result.emailId, !isStarred);
+  };
+
   const getInitials = (name?: string, email?: string) => {
     if (name) {
       return name
@@ -134,8 +152,23 @@ export function SearchResultCard({
                 </span>
               </div>
               <div className="flex items-center gap-2 shrink-0">
-                {result.isStarred && (
-                  <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                {onStar && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 hover:bg-muted transition-colors"
+                    onClick={handleStarClick}
+                    title={isStarred ? 'Unstar email' : 'Star email'}
+                  >
+                    <Star
+                      className={cn(
+                        'h-4 w-4 transition-all duration-200',
+                        isStarred
+                          ? 'fill-yellow-400 text-yellow-400 scale-110'
+                          : 'hover:text-yellow-400'
+                      )}
+                    />
+                  </Button>
                 )}
                 {result.hasAttachments && (
                   <Paperclip className="h-4 w-4 text-muted-foreground" />
