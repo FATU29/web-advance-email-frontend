@@ -44,6 +44,8 @@ export const EMAIL_ENDPOINTS = {
 // Kanban endpoints
 export const KANBAN_ENDPOINTS = {
   GET_BOARD: '/api/kanban/board',
+  GET_BOARD_FILTERED: '/api/kanban/board/filter',
+  SEARCH: '/api/kanban/search',
   SYNC_GMAIL: '/api/kanban/sync',
   GMAIL_STATUS: '/api/kanban/gmail-status',
   GET_COLUMNS: '/api/kanban/columns',

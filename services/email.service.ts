@@ -10,9 +10,6 @@ import {
   ISendEmailParams,
   IReplyEmailParams,
   IModifyEmailParams,
-  IUpdateKanbanStatusParams,
-  ISnoozeEmailParams,
-  IGetEmailSummaryParams,
   IEmailSummaryResponse,
   KanbanStatus,
 } from '@/types/api.types';

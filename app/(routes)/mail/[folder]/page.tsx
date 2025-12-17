@@ -8,6 +8,7 @@ import { ROUTES } from '@/utils/constants/routes';
 import { EmailLayout } from '@/components/email/email-layout';
 import { Sidebar } from '@/components/email/sidebar';
 import { ComposeEmailDialog } from '@/components/email/compose-email-dialog';
+import { SearchResultsView } from '@/components/email/search-results-view';
 import { type Message } from '@/components/ui/chat-message';
 import { ChatDialog } from '@/components/chat/chat-dialog';
 import useAuth from '@/lib/stores/use-auth';
@@ -52,6 +53,7 @@ export default function MailFolderPage({
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [size] = React.useState(20);
   const [composeOpen, setComposeOpen] = React.useState(false);
+  const [isSearchMode, setIsSearchMode] = React.useState(false);
   const [replyTo, setReplyTo] = React.useState<
     | {
         to: string[];
@@ -459,6 +461,19 @@ export default function MailFolderPage({
     router.push('/mail/kanban');
   };
 
+  const handleOpenSearch = () => {
+    setIsSearchMode(true);
+  };
+
+  const handleCloseSearch = () => {
+    setIsSearchMode(false);
+  };
+
+  const handleViewEmailFromSearch = (emailId: string) => {
+    setSelectedEmailId(emailId);
+    setIsSearchMode(false);
+  };
+
   const chatSuggestions = [
     'Summarize my emails',
     'Find important emails',
@@ -469,54 +484,63 @@ export default function MailFolderPage({
   //Render
   return (
     <div className="relative flex h-screen w-full flex-col">
-      <EmailLayout
-        sidebar={
-          <Sidebar
-            mailboxes={mailboxes}
-            user={
-              user
-                ? {
-                    id: user.id,
-                    name: user.name,
-                    email: user.email,
-                    avatar: user.profilePicture || undefined,
-                  }
-                : undefined
-            }
-            activeFolder={resolvedParams.folder}
-            onItemClick={handleSidebarItemClick}
-            onComposeClick={handleComposeClick}
-            onLogoutClick={handleLogoutClick}
-          />
-        }
-        emails={emails}
-        loading={emailsLoading}
-        isLoadingMore={isFetchingNextPage}
-        hasMore={hasNextPage || false}
-        onLoadMore={() => fetchNextPage()}
-        selectedEmails={selectedEmails}
-        onEmailSelect={handleEmailSelect}
-        onEmailClick={handleEmailClick}
-        onSelectAll={handleSelectAll}
-        onBulkAction={handleBulkAction}
-        onToggleKanban={handleToggleKanban}
-        selectedEmail={selectedEmail || undefined}
-        onBack={() => setSelectedEmailId(null)}
-        onReply={handleReply}
-        onReplyAll={handleReplyAll}
-        onForward={handleForward}
-        onArchive={handleArchive}
-        onDelete={handleDelete}
-        onStar={handleStar}
-        error={
-          emailsError instanceof Error
-            ? emailsError.message
-            : emailsError
-              ? 'Failed to load emails'
-              : null
-        }
-        className="h-full"
-      />
+      {isSearchMode ? (
+        <SearchResultsView
+          onBack={handleCloseSearch}
+          onViewEmail={handleViewEmailFromSearch}
+          className="h-full"
+        />
+      ) : (
+        <EmailLayout
+          sidebar={
+            <Sidebar
+              mailboxes={mailboxes}
+              user={
+                user
+                  ? {
+                      id: user.id,
+                      name: user.name,
+                      email: user.email,
+                      avatar: user.profilePicture || undefined,
+                    }
+                  : undefined
+              }
+              activeFolder={resolvedParams.folder}
+              onItemClick={handleSidebarItemClick}
+              onComposeClick={handleComposeClick}
+              onLogoutClick={handleLogoutClick}
+              onSearchClick={handleOpenSearch}
+            />
+          }
+          emails={emails}
+          loading={emailsLoading}
+          isLoadingMore={isFetchingNextPage}
+          hasMore={hasNextPage || false}
+          onLoadMore={() => fetchNextPage()}
+          selectedEmails={selectedEmails}
+          onEmailSelect={handleEmailSelect}
+          onEmailClick={handleEmailClick}
+          onSelectAll={handleSelectAll}
+          onBulkAction={handleBulkAction}
+          onToggleKanban={handleToggleKanban}
+          selectedEmail={selectedEmail || undefined}
+          onBack={() => setSelectedEmailId(null)}
+          onReply={handleReply}
+          onReplyAll={handleReplyAll}
+          onForward={handleForward}
+          onArchive={handleArchive}
+          onDelete={handleDelete}
+          onStar={handleStar}
+          error={
+            emailsError instanceof Error
+              ? emailsError.message
+              : emailsError
+                ? 'Failed to load emails'
+                : null
+          }
+          className="h-full"
+        />
+      )}
 
       {/* Sticky Chat Button */}
       <div className="fixed bottom-4 right-4 z-50">

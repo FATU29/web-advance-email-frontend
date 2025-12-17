@@ -26,7 +26,6 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -258,60 +257,129 @@ export function KanbanCard({
 
         {/* AI Summary */}
         {email.aiSummary && (
-          <div className="bg-linear-to-br from-muted/60 to-muted/40 rounded-lg p-2 border border-border/50 max-w-full overflow-hidden">
-            <div className="flex items-center justify-between gap-1.5 mb-1">
-              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                <div className="size-1.5 rounded-full bg-primary shrink-0"></div>
-                <span className="text-xs font-semibold text-foreground truncate">
+          <div className="bg-linear-to-br from-muted/60 to-muted/40 rounded-md p-1.5 border border-border/50 max-w-full overflow-hidden">
+            <div className="flex items-center justify-between gap-1 mb-0.5">
+              <div className="flex items-center gap-1 min-w-0 flex-1">
+                <div className="size-1 rounded-full bg-primary shrink-0"></div>
+                <span className="text-[10px] font-semibold text-foreground truncate">
                   AI Summary
                 </span>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-0.5 shrink-0">
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
                     <Button
                       variant="ghost"
                       size="icon"
-                      className="size-5 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="size-4 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => {
                         e.stopPropagation();
                         setIsDialogOpen(true);
                       }}
                       title="View full summary"
                     >
-                      <Maximize2 className="size-3" />
+                      <Maximize2 className="size-2.5" />
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[80vh]">
-                    <DialogHeader>
-                      <DialogTitle className="flex items-center gap-2">
-                        <Sparkles className="size-4 text-primary" />
+                  <DialogContent className="max-w-3xl max-h-[85vh]">
+                    <DialogHeader className="space-y-3">
+                      <DialogTitle className="flex items-center gap-2 text-xl">
+                        <Sparkles className="size-5 text-primary" />
                         AI Summary
                       </DialogTitle>
-                      <DialogDescription className="text-sm">
-                        <span className="font-semibold">Subject:</span>{' '}
-                        {email.subject || '(No Subject)'}
-                      </DialogDescription>
-                    </DialogHeader>
-                    <ScrollArea className="h-full max-h-[60vh] pr-4">
-                      <div className="space-y-4">
-                        <div className="rounded-lg bg-linear-to-br from-muted/60 to-muted/40 border border-border/50 p-4">
-                          <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
-                            {email.aiSummary}
-                          </p>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-start gap-2">
+                          <span className="font-semibold text-muted-foreground min-w-20">
+                            Subject:
+                          </span>
+                          <span className="flex-1 text-foreground">
+                            {email.subject || '(No Subject)'}
+                          </span>
                         </div>
                         {email.from && (
-                          <div className="text-xs text-muted-foreground">
-                            <span className="font-semibold">From:</span>{' '}
-                            {email.from}
+                          <div className="flex items-start gap-2">
+                            <span className="font-semibold text-muted-foreground min-w-20">
+                              From:
+                            </span>
+                            <span className="flex-1 text-foreground">
+                              {email.fromName || email.from}
+                              {email.fromName && (
+                                <span className="text-muted-foreground ml-1">
+                                  ({email.from})
+                                </span>
+                              )}
+                            </span>
                           </div>
                         )}
                         {email.receivedAt && (
-                          <div className="text-xs text-muted-foreground">
-                            <span className="font-semibold">Received:</span>{' '}
-                            {format(new Date(email.receivedAt), 'PPpp')}
+                          <div className="flex items-start gap-2">
+                            <span className="font-semibold text-muted-foreground min-w-20">
+                              Received:
+                            </span>
+                            <span className="flex-1 text-foreground">
+                              {format(new Date(email.receivedAt), 'PPpp')}
+                            </span>
                           </div>
                         )}
+                      </div>
+                    </DialogHeader>
+                    <ScrollArea className="h-full max-h-[calc(85vh-200px)] pr-4">
+                      <div className="space-y-3">
+                        <div className="rounded-lg bg-linear-to-br from-primary/5 to-primary/10 border-2 border-primary/20 p-5">
+                          <div className="prose prose-sm max-w-none dark:prose-invert">
+                            {email.aiSummary
+                              .split('\n')
+                              .map((paragraph, idx) => {
+                                // Check if line is a bullet point or numbered list
+                                const isBullet = paragraph
+                                  .trim()
+                                  .match(/^[•\-\*]\s/);
+                                const isNumbered = paragraph
+                                  .trim()
+                                  .match(/^\d+[\.\)]\s/);
+                                const isEmpty = paragraph.trim().length === 0;
+
+                                if (isEmpty && idx > 0) {
+                                  return <div key={idx} className="h-3" />;
+                                }
+
+                                if (isBullet) {
+                                  return (
+                                    <div key={idx} className="flex gap-2 mb-2">
+                                      <span className="text-primary font-bold mt-0.5">
+                                        •
+                                      </span>
+                                      <p className="flex-1 m-0 text-foreground leading-relaxed">
+                                        {paragraph.replace(/^[•\-\*]\s/, '')}
+                                      </p>
+                                    </div>
+                                  );
+                                }
+
+                                if (isNumbered) {
+                                  return (
+                                    <div key={idx} className="flex gap-2 mb-2">
+                                      <span className="text-primary font-bold mt-0.5">
+                                        {paragraph.match(/^\d+[\.\)]/)?.[0]}
+                                      </span>
+                                      <p className="flex-1 m-0 text-foreground leading-relaxed">
+                                        {paragraph.replace(/^\d+[\.\)]\s/, '')}
+                                      </p>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <p
+                                    key={idx}
+                                    className="text-foreground leading-relaxed mb-3"
+                                  >
+                                    {paragraph}
+                                  </p>
+                                );
+                              })}
+                          </div>
+                        </div>
                       </div>
                     </ScrollArea>
                   </DialogContent>
@@ -320,18 +388,20 @@ export function KanbanCard({
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="size-5 h-5 w-5 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="size-4 h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity"
                     onClick={handleGenerateSummary}
                     disabled={isGeneratingSummary}
                     title="Regenerate summary"
                   >
-                    <Sparkles className="size-3" />
+                    <Sparkles className="size-2.5" />
                   </Button>
                 )}
               </div>
             </div>
-            <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3 wrap-break-word">
-              {email.aiSummary}
+            <p className="text-[10px] text-muted-foreground leading-snug line-clamp-3 overflow-hidden wrap-break-word max-w-full">
+              {email.aiSummary.length > 150
+                ? `${email.aiSummary.substring(0, 150)}...`
+                : email.aiSummary}
             </p>
           </div>
         )}

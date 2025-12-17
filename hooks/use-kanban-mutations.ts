@@ -10,6 +10,7 @@ import KanbanService, {
   ICreateColumnRequest,
   IUpdateColumnRequest,
 } from '@/services/kanban.service';
+import { IKanbanFilterParams } from '@/types/api.types';
 import {
   useQuery,
   useMutation,
@@ -77,6 +78,31 @@ export const useKanbanColumnsQuery = (
 };
 
 /**
+ * Get filtered Kanban board query
+ */
+export const useKanbanFilteredBoardQuery = (
+  params: IKanbanFilterParams,
+  options?: Omit<
+    UseQueryOptions<IKanbanBoard, AxiosError>,
+    'queryKey' | 'queryFn'
+  >
+) => {
+  return useQuery({
+    queryKey: [...kanbanQueryKeys.board(), 'filtered', params],
+    queryFn: async () => {
+      const response = await KanbanService.getFilteredBoard(params);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(
+        response.data.message || 'Failed to fetch filtered board'
+      );
+    },
+    ...options,
+  });
+};
+
+/**
  * Get emails in column query
  */
 export const useKanbanEmailsInColumnQuery = (
@@ -138,15 +164,21 @@ export const useAddEmailToKanbanMutation = () => {
     mutationFn: (request: IAddEmailToKanbanRequest) =>
       KanbanService.addEmailToKanban(request),
     onSuccess: () => {
-      // Invalidate board and columns queries
-      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
-      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.columns() });
+      // Invalidate all board and columns queries (including filtered ones)
+      queryClient.invalidateQueries({
+        queryKey: kanbanQueryKeys.board(),
+        exact: false,
+      });
+      queryClient.invalidateQueries({
+        queryKey: kanbanQueryKeys.columns(),
+        exact: false,
+      });
     },
   });
 };
 
 /**
- * Move email mutation
+ * Move email mutation with optimistic updates
  */
 export const useMoveEmailMutation = () => {
   const queryClient = useQueryClient();
@@ -154,12 +186,108 @@ export const useMoveEmailMutation = () => {
   return useMutation({
     mutationFn: (request: IMoveEmailRequest) =>
       KanbanService.moveEmail(request),
-    onSuccess: () => {
-      // Invalidate board query to refresh all columns
-      // Use invalidateQueries with exact match to prevent unnecessary refetches
+    // Optimistic update: Update UI before API call
+    onMutate: async (request: IMoveEmailRequest) => {
+      // Cancel all outgoing refetches for board queries (including filtered)
+      await queryClient.cancelQueries({
+        queryKey: kanbanQueryKeys.board(),
+        exact: false, // Cancel all board queries including filtered ones
+      });
+
+      // Get all cached board queries (including filtered ones)
+      const queryCache = queryClient.getQueryCache();
+      const allBoardQueries = queryCache
+        .findAll({ queryKey: kanbanQueryKeys.board(), exact: false })
+        .map((q) => ({
+          key: q.queryKey,
+          data: q.state.data as IKanbanBoard | undefined,
+        }))
+        .filter((q) => q.data);
+
+      // Optimistically update all cached board queries
+      allBoardQueries.forEach(({ key, data }) => {
+        if (!data) return;
+
+        queryClient.setQueryData<IKanbanBoard>(key, (old) => {
+          if (!old) return old;
+
+          // Find the email in emailsByColumn
+          let emailToMove: IKanbanEmail | null = null;
+          let sourceColumnId: string | null = null;
+
+          // Find which column contains the email
+          for (const [columnId, emails] of Object.entries(old.emailsByColumn)) {
+            const email = emails.find((e) => e.emailId === request.emailId);
+            if (email) {
+              emailToMove = { ...email };
+              sourceColumnId = columnId;
+              break;
+            }
+          }
+
+          if (!emailToMove || !sourceColumnId) {
+            return old; // Email not found, return unchanged
+          }
+
+          // Create new emailsByColumn with the email moved
+          const newEmailsByColumn = { ...old.emailsByColumn };
+
+          // Remove from source column
+          newEmailsByColumn[sourceColumnId] = newEmailsByColumn[
+            sourceColumnId
+          ].filter((e) => e.emailId !== request.emailId);
+
+          // Add to target column (update columnId in email)
+          const updatedEmail = {
+            ...emailToMove,
+            columnId: request.targetColumnId,
+          };
+
+          if (!newEmailsByColumn[request.targetColumnId]) {
+            newEmailsByColumn[request.targetColumnId] = [];
+          }
+          newEmailsByColumn[request.targetColumnId] = [
+            ...newEmailsByColumn[request.targetColumnId],
+            updatedEmail,
+          ];
+
+          // Update column counts
+          const newColumns = old.columns.map((col) => {
+            if (col.id === sourceColumnId) {
+              return { ...col, emailCount: Math.max(0, col.emailCount - 1) };
+            }
+            if (col.id === request.targetColumnId) {
+              return { ...col, emailCount: col.emailCount + 1 };
+            }
+            return col;
+          });
+
+          return {
+            ...old,
+            columns: newColumns,
+            emailsByColumn: newEmailsByColumn,
+          };
+        });
+      });
+
+      // Return context with snapshots for rollback
+      return { previousQueries: allBoardQueries };
+    },
+    // Rollback on error
+    onError: (_error, _request, context) => {
+      if (context?.previousQueries) {
+        context.previousQueries.forEach(({ key, data }) => {
+          if (data) {
+            queryClient.setQueryData(key, data);
+          }
+        });
+      }
+    },
+    // Always refetch after error or success to ensure sync
+    onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: kanbanQueryKeys.board(),
-        exact: true,
+        exact: false, // Invalidate all board queries including filtered ones
       });
     },
   });
@@ -175,7 +303,10 @@ export const useSnoozeEmailKanbanMutation = () => {
     mutationFn: (request: ISnoozeEmailRequest) =>
       KanbanService.snoozeEmail(request),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
+      queryClient.invalidateQueries({
+        queryKey: kanbanQueryKeys.board(),
+        exact: false, // Invalidate all board queries including filtered ones
+      });
     },
   });
 };
@@ -189,7 +320,10 @@ export const useUnsnoozeEmailMutation = () => {
   return useMutation({
     mutationFn: (emailId: string) => KanbanService.unsnoozeEmail(emailId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
+      queryClient.invalidateQueries({
+        queryKey: kanbanQueryKeys.board(),
+        exact: false, // Invalidate all board queries including filtered ones
+      });
     },
   });
 };
@@ -203,10 +337,10 @@ export const useGenerateSummaryMutation = () => {
   return useMutation({
     mutationFn: (emailId: string) => KanbanService.generateSummary(emailId),
     onSuccess: (data, emailId) => {
-      // Invalidate board and specific email status with exact match
+      // Invalidate all board queries (including filtered ones) to show new summary
       queryClient.invalidateQueries({
         queryKey: kanbanQueryKeys.board(),
-        exact: true,
+        exact: false, // Invalidate all board queries including filtered ones
       });
       queryClient.invalidateQueries({
         queryKey: kanbanQueryKeys.emailStatus(emailId),
@@ -226,8 +360,14 @@ export const useRemoveEmailFromKanbanMutation = () => {
     mutationFn: (emailId: string) =>
       KanbanService.removeEmailFromKanban(emailId),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
-      queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.columns() });
+      queryClient.invalidateQueries({
+        queryKey: kanbanQueryKeys.board(),
+        exact: false, // Invalidate all board queries including filtered ones
+      });
+      queryClient.invalidateQueries({
+        queryKey: kanbanQueryKeys.columns(),
+        exact: false,
+      });
     },
   });
 };

@@ -230,4 +230,45 @@ export interface IEmailSummaryResponse {
   summary: string;
 }
 
+// Kanban Search Types
+export interface IKanbanSearchParams {
+  query: string;
+  limit?: number;
+  includeBody?: boolean;
+}
+
+export interface IKanbanSearchResult {
+  id: string;
+  emailId: string;
+  columnId: string;
+  columnName: string;
+  subject: string;
+  fromEmail: string;
+  fromName: string;
+  preview: string;
+  summary: string | null;
+  receivedAt: string;
+  isRead: boolean;
+  isStarred: boolean;
+  hasAttachments: boolean;
+  score: number;
+  matchedFields: string[];
+}
+
+export interface IKanbanSearchResponse {
+  query: string;
+  totalResults: number;
+  results: IKanbanSearchResult[];
+}
+
+// Kanban Filter Types
+export interface IKanbanFilterParams {
+  sortBy?: 'date_newest' | 'date_oldest' | 'sender_name';
+  unreadOnly?: boolean;
+  hasAttachmentsOnly?: boolean;
+  fromSender?: string;
+  columnId?: string;
+  maxEmailsPerColumn?: number;
+}
+
 //====================================================

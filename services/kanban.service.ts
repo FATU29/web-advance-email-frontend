@@ -36,10 +36,13 @@ export interface IKanbanEmail {
   receivedAt: string;
   isRead: boolean;
   isStarred: boolean;
+  hasAttachments?: boolean;
   summary?: string | null;
   summaryGeneratedAt?: string | null;
   snoozed: boolean;
   snoozeUntil?: string | null;
+  score?: number; // Relevance score for search results
+  matchedFields?: string[]; // Fields that matched in search
   createdAt: string;
   updatedAt: string;
 }
@@ -249,6 +252,72 @@ class KanbanService {
     columnId: string
   ): Promise<CustomAxiosResponse<ApiResponse<null>>> {
     return await axiosBI.delete(KANBAN_ENDPOINTS.DELETE_COLUMN(columnId));
+  }
+
+  /**
+   * Search emails on Kanban board with fuzzy matching
+   */
+  static async searchKanban(
+    query: string,
+    limit: number = 20,
+    includeBody: boolean = false
+  ): Promise<
+    CustomAxiosResponse<
+      ApiResponse<{
+        query: string;
+        totalResults: number;
+        results: IKanbanEmail[];
+      }>
+    >
+  > {
+    const params = new URLSearchParams();
+    params.append('query', query);
+    params.append('limit', limit.toString());
+    params.append('includeBody', includeBody.toString());
+
+    return await axiosBI.get(`${KANBAN_ENDPOINTS.SEARCH}?${params.toString()}`);
+  }
+
+  /**
+   * Get filtered and sorted Kanban board
+   */
+  static async getFilteredBoard(params: {
+    sortBy?: 'date_newest' | 'date_oldest' | 'sender_name';
+    unreadOnly?: boolean;
+    hasAttachmentsOnly?: boolean;
+    fromSender?: string;
+    columnId?: string;
+    maxEmailsPerColumn?: number;
+  }): Promise<CustomAxiosResponse<ApiResponse<IKanbanBoard>>> {
+    const queryParams = new URLSearchParams();
+
+    if (params.sortBy) {
+      queryParams.append('sortBy', params.sortBy);
+    }
+    if (params.unreadOnly) {
+      queryParams.append('unreadOnly', 'true');
+    }
+    if (params.hasAttachmentsOnly) {
+      queryParams.append('hasAttachmentsOnly', 'true');
+    }
+    if (params.fromSender) {
+      queryParams.append('fromSender', params.fromSender);
+    }
+    if (params.columnId) {
+      queryParams.append('columnId', params.columnId);
+    }
+    if (params.maxEmailsPerColumn) {
+      queryParams.append(
+        'maxEmailsPerColumn',
+        params.maxEmailsPerColumn.toString()
+      );
+    }
+
+    const url = queryParams.toString()
+      ? `${KANBAN_ENDPOINTS.GET_BOARD_FILTERED}?${queryParams.toString()}`
+      : KANBAN_ENDPOINTS.GET_BOARD_FILTERED;
+
+    return await axiosBI.get(url);
   }
 }
 

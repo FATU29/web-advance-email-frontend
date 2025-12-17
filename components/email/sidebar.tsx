@@ -13,6 +13,7 @@ import {
   FileText,
   Tag,
   Mail,
+  Search,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ export interface SidebarProps {
   onItemClick?: (folder: string) => void;
   onComposeClick?: () => void;
   onLogoutClick?: () => void;
+  onSearchClick?: () => void;
 }
 
 // Map mailbox type to icon
@@ -131,6 +133,7 @@ export function Sidebar({
   onItemClick,
   onComposeClick,
   onLogoutClick,
+  onSearchClick,
 }: SidebarProps) {
   //Init util function
   const getInitials = (name?: string | null) => {
@@ -188,11 +191,21 @@ export function Sidebar({
 
       {/* Compose Button */}
       {onComposeClick && (
-        <div className="border-b p-3">
+        <div className="border-b p-3 space-y-2">
           <Button className="w-full gap-2" onClick={onComposeClick}>
             <SquarePen className="size-4" />
             Compose
           </Button>
+          {onSearchClick && (
+            <Button
+              variant="outline"
+              className="w-full gap-2"
+              onClick={onSearchClick}
+            >
+              <Search className="size-4" />
+              Search
+            </Button>
+          )}
         </div>
       )}
 

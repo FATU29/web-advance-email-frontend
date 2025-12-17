@@ -3,12 +3,14 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { List, RefreshCw } from 'lucide-react';
+import { List, RefreshCw, Search } from 'lucide-react';
 
 import { Sidebar } from '@/components/email/sidebar';
 import { EmailDetail } from '@/components/email/email-detail';
 import { KanbanBoard } from '@/components/email/kanban-board';
+import { KanbanFilters } from '@/components/email/kanban-filters';
 import { SnoozeDialog } from '@/components/email/snooze-dialog';
+import { SearchResultsView } from '@/components/email/search-results-view';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -33,7 +35,7 @@ import {
   useToggleEmailStarMutation,
 } from '@/hooks/use-email-mutations';
 import {
-  useKanbanBoardQuery,
+  useKanbanFilteredBoardQuery,
   useGenerateSummaryMutation,
   useMoveEmailMutation,
   useSnoozeEmailKanbanMutation,
@@ -66,6 +68,13 @@ export default function KanbanPage() {
     Set<string>
   >(new Set());
   const [isSyncing, setIsSyncing] = React.useState(false);
+  const [sortBy, setSortBy] = React.useState<
+    'date-desc' | 'date-asc' | 'sender'
+  >('date-desc');
+  const [activeFilters, setActiveFilters] = React.useState<
+    Set<'unread' | 'attachments' | 'starred'>
+  >(new Set());
+  const [isSearchMode, setIsSearchMode] = React.useState(false);
 
   //Init effect hook - Prevent hydration mismatch with @dnd-kit
   React.useEffect(() => {
@@ -98,9 +107,37 @@ export default function KanbanPage() {
       refetchOnWindowFocus: false,
     });
 
-  // Fetch Kanban board data
+  // Map frontend sortBy to backend format
+  const backendSortBy = React.useMemo(():
+    | 'date_newest'
+    | 'date_oldest'
+    | 'sender_name' => {
+    switch (sortBy) {
+      case 'date-desc':
+        return 'date_newest';
+      case 'date-asc':
+        return 'date_oldest';
+      case 'sender':
+        return 'sender_name';
+      default:
+        return 'date_newest';
+    }
+  }, [sortBy]);
+
+  // Build filter params for backend API
+  const filterParams = React.useMemo(
+    () => ({
+      sortBy: backendSortBy,
+      unreadOnly: activeFilters.has('unread') ? true : undefined,
+      hasAttachmentsOnly: activeFilters.has('attachments') ? true : undefined,
+      // Note: starred filter is client-side only as backend doesn't support it
+    }),
+    [backendSortBy, activeFilters]
+  );
+
+  // Fetch filtered Kanban board data from backend
   const { data: kanbanBoardData, isLoading: kanbanLoading } =
-    useKanbanBoardQuery({
+    useKanbanFilteredBoardQuery(filterParams, {
       enabled: true, // Always enabled - using real API
       refetchOnWindowFocus: false,
       refetchOnMount: true,
@@ -152,6 +189,26 @@ export default function KanbanPage() {
     );
     return converted;
   }, [kanbanBoardData]);
+
+  // Apply client-side filters that backend doesn't support (starred only)
+  // Note: Backend handles sorting, unread, and attachments filters
+  const filteredAndSortedEmailsByColumn = React.useMemo((): Record<
+    string,
+    IEmailListItem[]
+  > => {
+    // If starred filter is not active, return emails as-is from backend
+    if (!activeFilters.has('starred')) {
+      return emailsByColumn;
+    }
+
+    // Apply starred filter client-side
+    const filtered: Record<string, IEmailListItem[]> = {};
+    Object.entries(emailsByColumn).forEach(([columnId, emails]) => {
+      filtered[columnId] = emails.filter((email) => email.isStarred);
+    });
+
+    return filtered;
+  }, [emailsByColumn, activeFilters]);
 
   // Flatten emails from all columns for other uses
   const emails = React.useMemo(() => {
@@ -349,6 +406,19 @@ export default function KanbanPage() {
     }
   };
 
+  const handleOpenSearch = () => {
+    setIsSearchMode(true);
+  };
+
+  const handleCloseSearch = () => {
+    setIsSearchMode(false);
+  };
+
+  const handleViewEmailFromSearch = (emailId: string) => {
+    setSelectedEmailId(emailId);
+    setIsSearchMode(false);
+  };
+
   // Filter out snoozed emails that haven't expired
   const visibleEmails = React.useMemo(() => {
     const now = new Date();
@@ -492,104 +562,139 @@ export default function KanbanPage() {
 
   return (
     <div className="flex h-screen flex-col">
-      {/* Header with Navigation */}
-      <div className="border-b px-4 py-3 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-xl font-semibold">Kanban Board</h1>
-            {(kanbanLoading || emailsLoading) && (
-              <span className="text-sm text-muted-foreground">Loading...</span>
-            )}
-            {!kanbanLoading && !emailsLoading && visibleEmails.length > 0 && (
-              <span className="text-sm text-muted-foreground">
-                {visibleEmails.length} email
-                {visibleEmails.length !== 1 ? 's' : ''}
-              </span>
-            )}
-            {/* Gmail Status Badge */}
-            {gmailStatusLoading ? (
-              <span className="text-xs text-muted-foreground">
-                Checking Gmail...
-              </span>
-            ) : gmailStatus?.connected ? (
-              <span className="text-xs text-green-600 flex items-center gap-1 px-2 py-1 rounded-full bg-green-50 dark:bg-green-950">
-                ✓ Gmail Connected
-              </span>
-            ) : (
-              <span className="text-xs text-orange-600 flex items-center gap-1 px-2 py-1 rounded-full bg-orange-50 dark:bg-orange-950">
-                ⚠️ Gmail not connected
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSyncGmail}
-            disabled={isSyncing || !gmailStatus?.connected || kanbanLoading}
-          >
-            <RefreshCw
-              className={cn('h-4 w-4 mr-2', isSyncing && 'animate-spin')}
+      {isSearchMode ? (
+        <SearchResultsView
+          onBack={handleCloseSearch}
+          onViewEmail={handleViewEmailFromSearch}
+          className="h-full"
+        />
+      ) : (
+        <>
+          {/* Header with Navigation */}
+          <div className="border-b px-4 py-3 shrink-0 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <h1 className="text-xl font-semibold">Kanban Board</h1>
+                  {(kanbanLoading || emailsLoading) && (
+                    <span className="text-sm text-muted-foreground">
+                      Loading...
+                    </span>
+                  )}
+                  {!kanbanLoading &&
+                    !emailsLoading &&
+                    visibleEmails.length > 0 && (
+                      <span className="text-sm text-muted-foreground">
+                        {visibleEmails.length} email
+                        {visibleEmails.length !== 1 ? 's' : ''}
+                      </span>
+                    )}
+                  {/* Gmail Status Badge */}
+                  {gmailStatusLoading ? (
+                    <span className="text-xs text-muted-foreground">
+                      Checking Gmail...
+                    </span>
+                  ) : gmailStatus?.connected ? (
+                    <span className="text-xs text-green-600 flex items-center gap-1 px-2 py-1 rounded-full bg-green-50 dark:bg-green-950">
+                      ✓ Gmail Connected
+                    </span>
+                  ) : (
+                    <span className="text-xs text-orange-600 flex items-center gap-1 px-2 py-1 rounded-full bg-orange-50 dark:bg-orange-950">
+                      ⚠️ Gmail not connected
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleOpenSearch}
+                  className="gap-2"
+                >
+                  <Search className="h-4 w-4" />
+                  Search
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSyncGmail}
+                  disabled={
+                    isSyncing || !gmailStatus?.connected || kanbanLoading
+                  }
+                >
+                  <RefreshCw
+                    className={cn('h-4 w-4 mr-2', isSyncing && 'animate-spin')}
+                  />
+                  {isSyncing ? 'Syncing...' : 'Sync Gmail'}
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleToggleView}>
+                  <List className="size-4 mr-2" />
+                  List View
+                </Button>
+              </div>
+            </div>
+
+            {/* Filter and Sort Controls */}
+            <KanbanFilters
+              sortBy={sortBy}
+              onSortChange={setSortBy}
+              activeFilters={activeFilters}
+              onFiltersChange={setActiveFilters}
             />
-            {isSyncing ? 'Syncing...' : 'Sync Gmail'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleToggleView}>
-            <List className="size-4 mr-2" />
-            List View
-          </Button>
-        </div>
-      </div>
+          </div>
 
-      {/* Kanban Board */}
-      <div className="flex-1 overflow-hidden p-4 md:p-6">
-        {!isMounted ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground">Loading...</p>
-            </div>
+          {/* Kanban Board */}
+          <div className="flex-1 overflow-hidden p-4 md:p-6">
+            {!isMounted ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-2">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-muted-foreground">Loading...</p>
+                </div>
+              </div>
+            ) : kanbanLoading || emailsLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-2">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                  <p className="text-muted-foreground">Loading emails...</p>
+                </div>
+              </div>
+            ) : visibleEmails.length === 0 ? (
+              <div className="flex items-center justify-center h-full">
+                <div className="text-center space-y-2">
+                  <p className="text-muted-foreground">No emails found</p>
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push('/mail/inbox')}
+                  >
+                    Go to Inbox
+                  </Button>
+                </div>
+              </div>
+            ) : kanbanBoardData ? (
+              <KanbanBoard
+                columns={kanbanBoardData.columns}
+                emailsByColumn={filteredAndSortedEmailsByColumn}
+                onMoveEmail={handleMoveEmail}
+                onCardClick={handleCardClick}
+                onCardSnooze={handleSnooze}
+                onCardStar={handleStar}
+                onCardGenerateSummary={handleGenerateSummary}
+                generatingSummaryIds={generatingSummaryIds}
+              />
+            ) : null}
           </div>
-        ) : kanbanLoading || emailsLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-2">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-              <p className="text-muted-foreground">Loading emails...</p>
-            </div>
-          </div>
-        ) : visibleEmails.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center space-y-2">
-              <p className="text-muted-foreground">No emails found</p>
-              <Button
-                variant="outline"
-                onClick={() => router.push('/mail/inbox')}
-              >
-                Go to Inbox
-              </Button>
-            </div>
-          </div>
-        ) : kanbanBoardData ? (
-          <KanbanBoard
-            columns={kanbanBoardData.columns}
-            emailsByColumn={emailsByColumn}
-            onMoveEmail={handleMoveEmail}
-            onCardClick={handleCardClick}
-            onCardSnooze={handleSnooze}
-            onCardStar={handleStar}
-            onCardGenerateSummary={handleGenerateSummary}
-            generatingSummaryIds={generatingSummaryIds}
+
+          {/* Snooze Dialog */}
+          <SnoozeDialog
+            open={snoozeDialogOpen}
+            email={emailToSnooze}
+            onOpenChange={setSnoozeDialogOpen}
+            onConfirm={handleSnoozeConfirm}
           />
-        ) : null}
-      </div>
-
-      {/* Snooze Dialog */}
-      <SnoozeDialog
-        open={snoozeDialogOpen}
-        email={emailToSnooze}
-        onOpenChange={setSnoozeDialogOpen}
-        onConfirm={handleSnoozeConfirm}
-      />
+        </>
+      )}
     </div>
   );
 }
