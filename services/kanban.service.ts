@@ -20,6 +20,10 @@ export interface IKanbanColumn {
   color: string;
   isDefault: boolean;
   emailCount: number;
+  gmailLabelId?: string | null;
+  gmailLabelName?: string | null;
+  addLabelsOnMove?: string[];
+  removeLabelsOnMove?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -90,6 +94,19 @@ export interface IUpdateColumnRequest {
   name?: string;
   color?: string;
   order?: number;
+  gmailLabelId?: string | null;
+  gmailLabelName?: string | null;
+  addLabelsOnMove?: string[];
+  removeLabelsOnMove?: string[];
+  clearLabelMapping?: boolean;
+}
+
+export interface IGmailLabel {
+  id: string;
+  name: string;
+  type: 'system' | 'user';
+  messageListVisibility: string;
+  labelListVisibility: string;
 }
 
 //====================================================
@@ -318,6 +335,15 @@ class KanbanService {
       : KANBAN_ENDPOINTS.GET_BOARD_FILTERED;
 
     return await axiosBI.get(url);
+  }
+
+  /**
+   * Get available Gmail labels for mapping
+   */
+  static async getGmailLabels(): Promise<
+    CustomAxiosResponse<ApiResponse<IGmailLabel[]>>
+  > {
+    return await axiosBI.get(KANBAN_ENDPOINTS.GMAIL_LABELS);
   }
 }
 

@@ -18,6 +18,10 @@ export default function QueryProvider({ children }: QueryProviderProps) {
             refetchOnWindowFocus: false,
             retry: 1,
           },
+          mutations: {
+            // Increased timeout for mutations (especially semantic search with embedding generation)
+            retry: 1,
+          },
         },
       })
   );

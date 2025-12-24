@@ -48,6 +48,7 @@ export const KANBAN_ENDPOINTS = {
   SEARCH: '/api/kanban/search',
   SYNC_GMAIL: '/api/kanban/sync',
   GMAIL_STATUS: '/api/kanban/gmail-status',
+  GMAIL_LABELS: '/api/kanban/gmail-labels',
   GET_COLUMNS: '/api/kanban/columns',
   CREATE_COLUMN: '/api/kanban/columns',
   UPDATE_COLUMN: (columnId: string) => `/api/kanban/columns/${columnId}`,
@@ -73,6 +74,15 @@ export const HEALTH_ENDPOINTS = {
 export const ATTACHMENT_ENDPOINTS = {
   DOWNLOAD: (messageId: string, attachmentId: string) =>
     `/api/attachments/${messageId}/${attachmentId}`,
+} as const;
+
+// Search endpoints
+export const SEARCH_ENDPOINTS = {
+  SEMANTIC: '/api/search/semantic',
+  SEMANTIC_STATUS: '/api/search/semantic/status',
+  SEMANTIC_GENERATE_EMBEDDINGS: '/api/search/semantic/generate-embeddings',
+  SUGGESTIONS: '/api/search/suggestions',
+  CONTACTS: '/api/search/contacts',
 } as const;
 
 //====================================================

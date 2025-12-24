@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { List, RefreshCw, Search } from 'lucide-react';
+import { List, RefreshCw, Search, Settings } from 'lucide-react';
 
 import { Sidebar } from '@/components/email/sidebar';
 import { EmailDetail } from '@/components/email/email-detail';
@@ -11,6 +11,7 @@ import { KanbanBoard } from '@/components/email/kanban-board';
 import { KanbanFilters } from '@/components/email/kanban-filters';
 import { SnoozeDialog } from '@/components/email/snooze-dialog';
 import { SearchResultsView } from '@/components/email/search-results-view';
+import { KanbanSettingsDialog } from '@/components/email/kanban-settings-dialog';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -616,6 +617,14 @@ export default function KanbanPage() {
                   <Search className="h-4 w-4" />
                   Search
                 </Button>
+                <KanbanSettingsDialog
+                  trigger={
+                    <Button variant="outline" size="sm" className="gap-2">
+                      <Settings className="h-4 w-4" />
+                      Settings
+                    </Button>
+                  }
+                />
                 <Button
                   variant="outline"
                   size="sm"

@@ -9,6 +9,7 @@ import KanbanService, {
   IKanbanSyncResult,
   ICreateColumnRequest,
   IUpdateColumnRequest,
+  IGmailLabel,
 } from '@/services/kanban.service';
 import { IKanbanFilterParams } from '@/types/api.types';
 import {
@@ -481,6 +482,28 @@ export const useDeleteColumnMutation = () => {
       queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
       queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.columns() });
     },
+  });
+};
+
+/**
+ * Get Gmail labels query
+ */
+export const useGmailLabelsQuery = (
+  options?: Omit<
+    UseQueryOptions<IGmailLabel[], AxiosError>,
+    'queryKey' | 'queryFn'
+  >
+) => {
+  return useQuery<IGmailLabel[], AxiosError>({
+    queryKey: [...kanbanQueryKeys.all, 'gmail-labels'] as const,
+    queryFn: async () => {
+      const response = await KanbanService.getGmailLabels();
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to fetch Gmail labels');
+    },
+    ...options,
   });
 };
 

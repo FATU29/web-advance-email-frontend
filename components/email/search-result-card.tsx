@@ -202,29 +202,47 @@ export function SearchResultCard({
                 {result.score !== undefined && (
                   <Badge
                     variant="outline"
-                    className="text-xs bg-primary/5 border-primary/20 text-primary hover:bg-primary/10 transition-colors"
+                    className="text-xs bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:from-purple-100 hover:to-blue-100 transition-colors"
+                    title={
+                      result.matchedFields?.includes('semantic')
+                        ? "Conceptual Match: This email is semantically related to your search query, even if it doesn't contain the exact keywords."
+                        : `Relevance Score: ${Math.round(result.score * 100)}% similarity`
+                    }
                   >
-                    <span className="font-semibold mr-1">Relevance:</span>
-                    {Math.round(result.score * 100)}%
+                    {result.matchedFields?.includes('semantic') ? (
+                      <>
+                        <span className="font-semibold mr-1">
+                          🧠 Conceptual Match:
+                        </span>
+                        {Math.round(result.score * 100)}%
+                      </>
+                    ) : (
+                      <>
+                        <span className="font-semibold mr-1">Relevance:</span>
+                        {Math.round(result.score * 100)}%
+                      </>
+                    )}
                   </Badge>
                 )}
-                {result.matchedFields && result.matchedFields.length > 0 && (
-                  <Badge
-                    variant="secondary"
-                    className="text-xs bg-secondary/50 hover:bg-secondary/70 transition-colors"
-                  >
-                    <span className="font-semibold mr-1">Matched:</span>
-                    {result.matchedFields
-                      .map((field) =>
-                        field === 'fromName'
-                          ? 'sender'
-                          : field === 'fromEmail'
-                            ? 'email'
-                            : field
-                      )
-                      .join(', ')}
-                  </Badge>
-                )}
+                {result.matchedFields &&
+                  result.matchedFields.length > 0 &&
+                  !result.matchedFields.includes('semantic') && (
+                    <Badge
+                      variant="secondary"
+                      className="text-xs bg-secondary/50 hover:bg-secondary/70 transition-colors"
+                    >
+                      <span className="font-semibold mr-1">Matched:</span>
+                      {result.matchedFields
+                        .map((field) =>
+                          field === 'fromName'
+                            ? 'sender'
+                            : field === 'fromEmail'
+                              ? 'email'
+                              : field
+                        )
+                        .join(', ')}
+                    </Badge>
+                  )}
               </div>
             )}
           </div>

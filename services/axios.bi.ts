@@ -122,7 +122,7 @@ const refreshAccessToken = async (): Promise<string | null> => {
 const createAxiosInstance = (baseURL?: string): AxiosInstance => {
   const instance = axios.create({
     baseURL: baseURL || process.env.NEXT_PUBLIC_API_BASE_URL || '',
-    timeout: 30000,
+    timeout: 180000, // 3 minutes - increased for semantic search with embedding generation
     headers: {
       'Content-Type': 'application/json',
     },
