@@ -13,20 +13,19 @@ export interface ISemanticSearchRequest {
 }
 
 export interface ISemanticSearchResult {
-  id: string;
   emailId: string;
-  columnId: string;
-  columnName: string;
   subject: string;
   fromEmail: string;
   fromName: string;
   preview: string;
-  summary: string | null;
+  columnId: string;
+  columnName: string;
   receivedAt: string;
-  isRead: boolean;
-  isStarred: boolean;
+  read: boolean;
+  starred: boolean;
   hasAttachments: boolean;
   similarityScore: number;
+  summary: string | null;
 }
 
 export interface ISemanticSearchResponse {
@@ -86,6 +85,33 @@ class SearchService {
     request: ISemanticSearchRequest
   ): Promise<CustomAxiosResponse<ApiResponse<ISemanticSearchResponse>>> {
     return await axiosBI.post(SEARCH_ENDPOINTS.SEMANTIC, request);
+  }
+
+  /**
+   * Generate embeddings for all emails that don't have them
+   * @returns Number of embeddings generated
+   */
+  static async generateEmbeddings(): Promise<
+    CustomAxiosResponse<
+      ApiResponse<{
+        generated: number;
+        message: string;
+      }>
+    >
+  > {
+    return await axiosBI.post(SEARCH_ENDPOINTS.SEMANTIC_GENERATE_EMBEDDINGS);
+  }
+
+  /**
+   * Generate embedding for a single email
+   * @param emailId - The email ID to generate embedding for
+   */
+  static async generateSingleEmbedding(
+    emailId: string
+  ): Promise<CustomAxiosResponse<ApiResponse<{ success: boolean }>>> {
+    return await axiosBI.post(
+      SEARCH_ENDPOINTS.SEMANTIC_GENERATE_SINGLE_EMBEDDING(emailId)
+    );
   }
 
   /**

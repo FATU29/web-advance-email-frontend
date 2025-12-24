@@ -16,6 +16,7 @@ import { useToggleEmailStarMutation } from '@/hooks/use-email-mutations';
 import { IKanbanEmail } from '@/services/kanban.service';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export interface SearchResultsViewProps {
   onBack: () => void;
@@ -37,6 +38,7 @@ export function SearchResultsView({
   const [activeQuery, setActiveQuery] = React.useState('');
   const [includeBody] = React.useState(true);
   const [searchMode, setSearchMode] = React.useState<SearchMode>('both');
+  const isMobile = useIsMobile();
 
   // Check semantic search availability
   const { data: semanticStatus } = useSemanticSearchStatusQuery();
@@ -77,18 +79,20 @@ export function SearchResultsView({
 
       // Add semantic results (may override fuzzy if same emailId)
       semanticResults.forEach((result) => {
+        // Find if we already have this email from fuzzy search
+        const existing = resultsMap.get(result.emailId);
         resultsMap.set(result.emailId, {
-          id: result.id,
+          id: existing?.id || `semantic_${result.emailId}`,
           emailId: result.emailId,
           columnId: result.columnId,
-          orderInColumn: 0,
+          orderInColumn: existing?.orderInColumn || 0,
           subject: result.subject,
           fromEmail: result.fromEmail,
           fromName: result.fromName,
           preview: result.preview,
           receivedAt: result.receivedAt,
-          isRead: result.isRead,
-          isStarred: result.isStarred,
+          isRead: result.read,
+          isStarred: result.starred,
           hasAttachments: result.hasAttachments,
           summary: result.summary,
           score: result.similarityScore,
@@ -112,7 +116,7 @@ export function SearchResultsView({
         query: semanticSearchMutation.data.query,
         totalResults: semanticSearchMutation.data.totalResults,
         results: semanticSearchMutation.data.results.map((result) => ({
-          id: result.id,
+          id: `semantic_${result.emailId}`,
           emailId: result.emailId,
           columnId: result.columnId,
           orderInColumn: 0,
@@ -121,8 +125,8 @@ export function SearchResultsView({
           fromName: result.fromName,
           preview: result.preview,
           receivedAt: result.receivedAt,
-          isRead: result.isRead,
-          isStarred: result.isStarred,
+          isRead: result.read,
+          isStarred: result.starred,
           hasAttachments: result.hasAttachments,
           summary: result.summary,
           score: result.similarityScore,
@@ -174,7 +178,7 @@ export function SearchResultsView({
         {
           query: trimmedQuery,
           limit: 50,
-          minScore: 0.7,
+          minScore: 0.2, // Recommended default for balanced results (0.15-0.25 range)
           generateMissingEmbeddings: generateMissing,
         },
         {
@@ -277,14 +281,19 @@ export function SearchResultsView({
 
   return (
     <div className={cn('flex flex-col h-full overflow-hidden', className)}>
-      {/* Header with Search Bar */}
-      <div className="shrink-0 border-b bg-background p-4 space-y-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="h-5 w-5" />
+      {/* Header with Search Bar - Mobile optimized */}
+      <div className="shrink-0 border-b bg-background p-3 sm:p-4 space-y-3 sm:space-y-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onBack}
+            className="h-9 w-9 sm:h-10 sm:w-10"
+          >
+            <ArrowLeft className="h-4 w-4 sm:h-5 sm:w-5" />
             <span className="sr-only">Back to mail</span>
           </Button>
-          <h2 className="text-lg font-semibold">Search Emails</h2>
+          <h2 className="text-base sm:text-lg font-semibold">Search Emails</h2>
         </div>
 
         <div className="space-y-2">
@@ -293,25 +302,33 @@ export function SearchResultsView({
             onChange={setSearchQuery}
             onSearch={handleSearch}
             onClear={handleClear}
-            placeholder="Search by sender, subject, or content..."
-            autoFocus
+            placeholder={
+              isMobile
+                ? 'Search emails...'
+                : 'Search by sender, subject, or content...'
+            }
+            autoFocus={!isMobile}
             searchMode={searchMode}
             onSearchModeChange={
               semanticStatus?.available ? handleSearchModeChange : undefined
             }
           />
           {searchMode === 'both' && semanticStatus?.available && (
-            <div className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 px-3 py-2 bg-linear-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
               <div className="flex items-center gap-2 text-xs font-medium text-blue-700 dark:text-blue-300">
-                <Search className="h-4 w-4" />
-                <span>Both Text & AI Semantic Search</span>
+                <Search className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
+                <span className="text-[11px] sm:text-xs">
+                  Both Text & AI Search
+                </span>
               </div>
-              <Badge variant="secondary" className="text-xs">
-                Combined Results
+              <Badge variant="secondary" className="text-[10px] sm:text-xs">
+                Combined
               </Badge>
-              <div className="text-xs text-blue-600 dark:text-blue-400 ml-auto">
-                💡 Showing results from both search methods
-              </div>
+              {!isMobile && (
+                <div className="text-xs text-blue-600 dark:text-blue-400 sm:ml-auto">
+                  💡 Showing results from both search methods
+                </div>
+              )}
             </div>
           )}
           {searchMode === 'semantic' && semanticStatus?.available && (

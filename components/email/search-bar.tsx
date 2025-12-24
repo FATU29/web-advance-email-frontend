@@ -10,6 +10,7 @@ import { useSearchSuggestionsQuery } from '@/hooks/use-search-suggestions';
 import { useDebounce } from '@/hooks/useDebounce';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export interface SearchBarProps {
   value: string;
@@ -41,6 +42,7 @@ export function SearchBar({
   const [selectedIndex, setSelectedIndex] = React.useState(-1);
   const inputRef = React.useRef<HTMLInputElement>(null);
   const suggestionsRef = React.useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   // Debounce search query for suggestions
   const debouncedQuery = useDebounce(value, 300);
@@ -175,7 +177,12 @@ export function SearchBar({
 
   //Render
   return (
-    <div className={cn('relative flex items-center gap-2', className)}>
+    <div
+      className={cn(
+        'relative flex flex-col sm:flex-row items-stretch sm:items-center gap-2',
+        className
+      )}
+    >
       <div className="relative flex-1">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors pointer-events-none z-10" />
@@ -191,7 +198,7 @@ export function SearchBar({
             onKeyDown={handleKeyDown}
             onFocus={handleFocus}
             onBlur={handleBlur}
-            className="pl-9 pr-9 transition-all focus:ring-2 focus:ring-primary/20"
+            className="pl-9 pr-9 h-10 sm:h-auto transition-all focus:ring-2 focus:ring-primary/20"
             autoFocus={autoFocus}
           />
           {value && (
@@ -212,9 +219,9 @@ export function SearchBar({
         {hasSuggestions && (
           <div
             ref={suggestionsRef}
-            className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-50 max-h-[400px] animate-in fade-in slide-in-from-top-2"
+            className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-50 max-h-[400px] sm:max-h-[300px] animate-in fade-in slide-in-from-top-2"
           >
-            <div className="max-h-[400px] overflow-y-auto">
+            <ScrollArea className="max-h-[400px] sm:max-h-[300px]">
               <div className="p-1">
                 {/* Contacts Section */}
                 {suggestions && suggestions.contacts.length > 0 && (
@@ -379,53 +386,76 @@ export function SearchBar({
                     </div>
                   )}
               </div>
-            </div>
+            </ScrollArea>
           </div>
         )}
       </div>
 
-      {/* Search Mode Toggle - 3 buttons: Both, Semantic, Fuzzy */}
+      {/* Search Mode Toggle - Mobile: Stack vertically, Desktop: Horizontal */}
       {onSearchModeChange && (
-        <div className="flex items-center gap-1 border rounded-md p-1 bg-muted/50">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-1 border rounded-md p-1 bg-muted/50">
+            <Button
+              variant={searchMode === 'both' ? 'secondary' : 'ghost'}
+              size="sm"
+              className={cn(
+                'flex-1 sm:flex-none h-9 sm:h-8 px-3 text-xs',
+                isMobile && 'min-w-0'
+              )}
+              onClick={() => onSearchModeChange('both')}
+              title="Search with both text and AI semantic search"
+            >
+              {isMobile ? 'Both' : 'Both'}
+            </Button>
+            <Button
+              variant={searchMode === 'semantic' ? 'secondary' : 'ghost'}
+              size="sm"
+              className={cn(
+                'flex-1 sm:flex-none h-9 sm:h-8 px-2 sm:px-3 text-xs',
+                isMobile && 'min-w-0'
+              )}
+              onClick={() => onSearchModeChange('semantic')}
+              title="AI-powered conceptual search"
+            >
+              <Sparkles className="h-3 w-3 mr-1" />
+              {isMobile ? 'AI' : 'Semantic'}
+            </Button>
+            <Button
+              variant={searchMode === 'fuzzy' ? 'secondary' : 'ghost'}
+              size="sm"
+              className={cn(
+                'flex-1 sm:flex-none h-9 sm:h-8 px-3 text-xs',
+                isMobile && 'min-w-0'
+              )}
+              onClick={() => onSearchModeChange('fuzzy')}
+              title="Text search with typo tolerance"
+            >
+              {isMobile ? 'Text' : 'Fuzzy'}
+            </Button>
+          </div>
+
           <Button
-            variant={searchMode === 'both' ? 'secondary' : 'ghost'}
-            size="sm"
-            className="h-8 px-3 text-xs"
-            onClick={() => onSearchModeChange('both')}
-            title="Search with both text and AI semantic search"
+            onClick={() => value.trim() && onSearch(value.trim())}
+            disabled={!value.trim()}
+            className="h-10 sm:h-auto transition-all hover:scale-105 active:scale-95 disabled:scale-100 w-full sm:w-auto"
           >
-            Both
-          </Button>
-          <Button
-            variant={searchMode === 'semantic' ? 'secondary' : 'ghost'}
-            size="sm"
-            className="h-8 px-3 text-xs"
-            onClick={() => onSearchModeChange('semantic')}
-            title="AI-powered conceptual search"
-          >
-            <Sparkles className="h-3 w-3 mr-1" />
-            Semantic
-          </Button>
-          <Button
-            variant={searchMode === 'fuzzy' ? 'secondary' : 'ghost'}
-            size="sm"
-            className="h-8 px-3 text-xs"
-            onClick={() => onSearchModeChange('fuzzy')}
-            title="Text search with typo tolerance"
-          >
-            Fuzzy
+            <Search className="h-4 w-4 mr-2" />
+            Search
           </Button>
         </div>
       )}
 
-      <Button
-        onClick={() => value.trim() && onSearch(value.trim())}
-        disabled={!value.trim()}
-        className="transition-all hover:scale-105 active:scale-95 disabled:scale-100"
-      >
-        <Search className="h-4 w-4 mr-2" />
-        Search
-      </Button>
+      {/* Search button without mode toggle */}
+      {!onSearchModeChange && (
+        <Button
+          onClick={() => value.trim() && onSearch(value.trim())}
+          disabled={!value.trim()}
+          className="h-10 sm:h-auto transition-all hover:scale-105 active:scale-95 disabled:scale-100 w-full sm:w-auto"
+        >
+          <Search className="h-4 w-4 mr-2" />
+          Search
+        </Button>
+      )}
     </div>
   );
 }

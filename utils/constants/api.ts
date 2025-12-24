@@ -81,6 +81,8 @@ export const SEARCH_ENDPOINTS = {
   SEMANTIC: '/api/search/semantic',
   SEMANTIC_STATUS: '/api/search/semantic/status',
   SEMANTIC_GENERATE_EMBEDDINGS: '/api/search/semantic/generate-embeddings',
+  SEMANTIC_GENERATE_SINGLE_EMBEDDING: (emailId: string) =>
+    `/api/search/semantic/generate-embedding/${emailId}`,
   SUGGESTIONS: '/api/search/suggestions',
   CONTACTS: '/api/search/contacts',
 } as const;

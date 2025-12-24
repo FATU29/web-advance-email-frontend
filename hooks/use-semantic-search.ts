@@ -57,4 +57,36 @@ export const useSemanticSearchMutation = () => {
   });
 };
 
+/**
+ * Generate embeddings for all emails that don't have them
+ */
+export const useGenerateEmbeddingsMutation = () => {
+  return useMutation<{ generated: number; message: string }, AxiosError, void>({
+    mutationFn: async () => {
+      const response = await SearchService.generateEmbeddings();
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(response.data.message || 'Failed to generate embeddings');
+    },
+  });
+};
+
+/**
+ * Generate embedding for a single email
+ */
+export const useGenerateSingleEmbeddingMutation = () => {
+  return useMutation<{ success: boolean }, AxiosError, string>({
+    mutationFn: async (emailId: string) => {
+      const response = await SearchService.generateSingleEmbedding(emailId);
+      if (response.data.success && response.data.data) {
+        return response.data.data;
+      }
+      throw new Error(
+        response.data.message || 'Failed to generate embedding for email'
+      );
+    },
+  });
+};
+
 //====================================================
