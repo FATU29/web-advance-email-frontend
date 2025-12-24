@@ -67,8 +67,7 @@ export function KanbanSettingsDialog({
     : setInternalOpen;
 
   // Fetch columns
-  const { data: columns = [], refetch: refetchColumns } =
-    useKanbanColumnsQuery();
+  const { data: columns = [] } = useKanbanColumnsQuery();
 
   // Fetch Gmail status
   const { data: gmailStatus } = useGmailStatusQuery();
@@ -110,7 +109,7 @@ export function KanbanSettingsDialog({
       });
       toast.success('Column created successfully');
       setNewColumnName('');
-      refetchColumns();
+      // No need to refetch - optimistic update handles this
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to create column'
@@ -139,7 +138,7 @@ export function KanbanSettingsDialog({
       toast.success('Column updated successfully');
       setEditingColumnId(null);
       setEditingColumnName('');
-      refetchColumns();
+      // No need to refetch - optimistic update handles this
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to update column'
@@ -169,7 +168,7 @@ export function KanbanSettingsDialog({
     try {
       await deleteColumnMutation.mutateAsync(column.id);
       toast.success('Column deleted successfully');
-      refetchColumns();
+      // No need to refetch - optimistic update handles this
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to delete column'
@@ -193,7 +192,7 @@ export function KanbanSettingsDialog({
       });
       toast.success('Label mapping saved successfully');
       setSelectedColumnForLabelMapping(null);
-      refetchColumns();
+      // No need to refetch - optimistic update handles this
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to save label mapping'
@@ -211,7 +210,7 @@ export function KanbanSettingsDialog({
       });
       toast.success('Label mapping cleared');
       setSelectedColumnForLabelMapping(null);
-      refetchColumns();
+      // No need to refetch - optimistic update handles this
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to clear label mapping'

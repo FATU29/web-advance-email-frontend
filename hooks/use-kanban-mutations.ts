@@ -417,7 +417,7 @@ export const useSyncGmailMutation = () => {
 };
 
 /**
- * Create column mutation
+ * Create column mutation with optimistic updates
  */
 export const useCreateColumnMutation = () => {
   const queryClient = useQueryClient();
@@ -430,7 +430,99 @@ export const useCreateColumnMutation = () => {
       }
       throw new Error(response.data.message || 'Failed to create column');
     },
-    onSuccess: () => {
+    // Optimistic update: Update UI immediately with temporary column
+    onMutate: async (request) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: kanbanQueryKeys.board() });
+      await queryClient.cancelQueries({ queryKey: kanbanQueryKeys.columns() });
+
+      // Snapshot previous values
+      const previousBoard = queryClient.getQueryData<IKanbanBoard>(
+        kanbanQueryKeys.board()
+      );
+      const previousColumns = queryClient.getQueryData<IKanbanColumn[]>(
+        kanbanQueryKeys.columns()
+      );
+
+      // Create optimistic column
+      const optimisticColumn: IKanbanColumn = {
+        id: `temp-${Date.now()}`, // Temporary ID
+        name: request.name,
+        type: 'CUSTOM',
+        order: request.order || 999,
+        color: request.color || '#6366f1',
+        isDefault: false,
+        emailCount: 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Optimistically update board cache
+      if (previousBoard) {
+        queryClient.setQueryData<IKanbanBoard>(
+          kanbanQueryKeys.board(),
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              columns: [...old.columns, optimisticColumn],
+            };
+          }
+        );
+      }
+
+      // Optimistically update columns cache
+      if (previousColumns) {
+        queryClient.setQueryData<IKanbanColumn[]>(
+          kanbanQueryKeys.columns(),
+          (old) => {
+            if (!old) return old;
+            return [...old, optimisticColumn];
+          }
+        );
+      }
+
+      // Return context for rollback
+      return { previousBoard, previousColumns };
+    },
+    // Rollback on error
+    onError: (err, variables, context) => {
+      if (context?.previousBoard) {
+        queryClient.setQueryData(
+          kanbanQueryKeys.board(),
+          context.previousBoard
+        );
+      }
+      if (context?.previousColumns) {
+        queryClient.setQueryData(
+          kanbanQueryKeys.columns(),
+          context.previousColumns
+        );
+      }
+    },
+    // Replace optimistic data with real data from server
+    onSuccess: (newColumn) => {
+      queryClient.setQueryData<IKanbanBoard>(kanbanQueryKeys.board(), (old) => {
+        if (!old) return old;
+        return {
+          ...old,
+          columns: old.columns.map((col) =>
+            col.id.startsWith('temp-') ? newColumn : col
+          ),
+        };
+      });
+      queryClient.setQueryData<IKanbanColumn[]>(
+        kanbanQueryKeys.columns(),
+        (old) => {
+          if (!old) return old;
+          return old.map((col) =>
+            col.id.startsWith('temp-') ? newColumn : col
+          );
+        }
+      );
+    },
+    // Refetch to ensure sync with server
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
       queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.columns() });
     },
@@ -438,7 +530,7 @@ export const useCreateColumnMutation = () => {
 };
 
 /**
- * Update column mutation
+ * Update column mutation with optimistic updates
  */
 export const useUpdateColumnMutation = () => {
   const queryClient = useQueryClient();
@@ -457,7 +549,135 @@ export const useUpdateColumnMutation = () => {
       }
       throw new Error(response.data.message || 'Failed to update column');
     },
-    onSuccess: () => {
+    // Optimistic update: Update UI immediately
+    onMutate: async ({ columnId, request }) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: kanbanQueryKeys.board() });
+      await queryClient.cancelQueries({ queryKey: kanbanQueryKeys.columns() });
+
+      // Snapshot previous values
+      const previousBoard = queryClient.getQueryData<IKanbanBoard>(
+        kanbanQueryKeys.board()
+      );
+      const previousColumns = queryClient.getQueryData<IKanbanColumn[]>(
+        kanbanQueryKeys.columns()
+      );
+
+      // Optimistically update board cache
+      if (previousBoard) {
+        queryClient.setQueryData<IKanbanBoard>(
+          kanbanQueryKeys.board(),
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              columns: old.columns.map((col) => {
+                if (col.id === columnId) {
+                  // Handle clear mapping
+                  if (request.clearLabelMapping) {
+                    return {
+                      ...col,
+                      gmailLabelId: null,
+                      gmailLabelName: null,
+                      addLabelsOnMove: [],
+                      removeLabelsOnMove: [],
+                    };
+                  }
+                  // Update with new values
+                  return {
+                    ...col,
+                    ...(request.name !== undefined && { name: request.name }),
+                    ...(request.color !== undefined && {
+                      color: request.color,
+                    }),
+                    ...(request.order !== undefined && {
+                      order: request.order,
+                    }),
+                    ...(request.gmailLabelId !== undefined && {
+                      gmailLabelId: request.gmailLabelId,
+                    }),
+                    ...(request.gmailLabelName !== undefined && {
+                      gmailLabelName: request.gmailLabelName,
+                    }),
+                    ...(request.addLabelsOnMove !== undefined && {
+                      addLabelsOnMove: request.addLabelsOnMove,
+                    }),
+                    ...(request.removeLabelsOnMove !== undefined && {
+                      removeLabelsOnMove: request.removeLabelsOnMove,
+                    }),
+                  };
+                }
+                return col;
+              }),
+            };
+          }
+        );
+      }
+
+      // Optimistically update columns cache
+      if (previousColumns) {
+        queryClient.setQueryData<IKanbanColumn[]>(
+          kanbanQueryKeys.columns(),
+          (old) => {
+            if (!old) return old;
+            return old.map((col) => {
+              if (col.id === columnId) {
+                // Handle clear mapping
+                if (request.clearLabelMapping) {
+                  return {
+                    ...col,
+                    gmailLabelId: null,
+                    gmailLabelName: null,
+                    addLabelsOnMove: [],
+                    removeLabelsOnMove: [],
+                  };
+                }
+                // Update with new values
+                return {
+                  ...col,
+                  ...(request.name !== undefined && { name: request.name }),
+                  ...(request.color !== undefined && { color: request.color }),
+                  ...(request.order !== undefined && { order: request.order }),
+                  ...(request.gmailLabelId !== undefined && {
+                    gmailLabelId: request.gmailLabelId,
+                  }),
+                  ...(request.gmailLabelName !== undefined && {
+                    gmailLabelName: request.gmailLabelName,
+                  }),
+                  ...(request.addLabelsOnMove !== undefined && {
+                    addLabelsOnMove: request.addLabelsOnMove,
+                  }),
+                  ...(request.removeLabelsOnMove !== undefined && {
+                    removeLabelsOnMove: request.removeLabelsOnMove,
+                  }),
+                };
+              }
+              return col;
+            });
+          }
+        );
+      }
+
+      // Return context with previous values for rollback
+      return { previousBoard, previousColumns };
+    },
+    // Rollback on error
+    onError: (err, variables, context) => {
+      if (context?.previousBoard) {
+        queryClient.setQueryData(
+          kanbanQueryKeys.board(),
+          context.previousBoard
+        );
+      }
+      if (context?.previousColumns) {
+        queryClient.setQueryData(
+          kanbanQueryKeys.columns(),
+          context.previousColumns
+        );
+      }
+    },
+    // Refetch to ensure sync with server
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
       queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.columns() });
     },
@@ -465,7 +685,7 @@ export const useUpdateColumnMutation = () => {
 };
 
 /**
- * Delete column mutation
+ * Delete column mutation with optimistic updates
  */
 export const useDeleteColumnMutation = () => {
   const queryClient = useQueryClient();
@@ -474,11 +694,75 @@ export const useDeleteColumnMutation = () => {
     mutationFn: async (columnId: string) => {
       const response = await KanbanService.deleteColumn(columnId);
       if (response.data.success) {
-        return;
+        return columnId;
       }
       throw new Error(response.data.message || 'Failed to delete column');
     },
-    onSuccess: () => {
+    // Optimistic update: Remove column immediately from UI
+    onMutate: async (columnId) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({ queryKey: kanbanQueryKeys.board() });
+      await queryClient.cancelQueries({ queryKey: kanbanQueryKeys.columns() });
+
+      // Snapshot previous values
+      const previousBoard = queryClient.getQueryData<IKanbanBoard>(
+        kanbanQueryKeys.board()
+      );
+      const previousColumns = queryClient.getQueryData<IKanbanColumn[]>(
+        kanbanQueryKeys.columns()
+      );
+
+      // Optimistically remove column from board cache
+      if (previousBoard) {
+        queryClient.setQueryData<IKanbanBoard>(
+          kanbanQueryKeys.board(),
+          (old) => {
+            if (!old) return old;
+            return {
+              ...old,
+              columns: old.columns.filter((col) => col.id !== columnId),
+              // Remove emails from deleted column
+              emailsByColumn: Object.fromEntries(
+                Object.entries(old.emailsByColumn).filter(
+                  ([key]) => key !== columnId
+                )
+              ),
+            };
+          }
+        );
+      }
+
+      // Optimistically remove column from columns cache
+      if (previousColumns) {
+        queryClient.setQueryData<IKanbanColumn[]>(
+          kanbanQueryKeys.columns(),
+          (old) => {
+            if (!old) return old;
+            return old.filter((col) => col.id !== columnId);
+          }
+        );
+      }
+
+      // Return context for rollback
+      return { previousBoard, previousColumns };
+    },
+    // Rollback on error
+    onError: (err, variables, context) => {
+      if (context?.previousBoard) {
+        queryClient.setQueryData(
+          kanbanQueryKeys.board(),
+          context.previousBoard
+        );
+      }
+      if (context?.previousColumns) {
+        queryClient.setQueryData(
+          kanbanQueryKeys.columns(),
+          context.previousColumns
+        );
+      }
+    },
+    // Refetch to ensure sync with server
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.board() });
       queryClient.invalidateQueries({ queryKey: kanbanQueryKeys.columns() });
     },
