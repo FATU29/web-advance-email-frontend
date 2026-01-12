@@ -41,6 +41,7 @@ export interface EmailLayoutProps {
     action: 'read' | 'unread' | 'star' | 'unstar' | 'delete' | 'archive',
     emailIds: string[]
   ) => void;
+  focusedEmailIndex?: number;
   error?: string | null;
 
   // Detail props
@@ -72,6 +73,7 @@ export function EmailLayout({
   onEmailClick,
   onSelectAll,
   onBulkAction,
+  focusedEmailIndex = -1,
   error = null,
   selectedEmail,
   onBack,
@@ -144,6 +146,7 @@ export function EmailLayout({
                 onSelectAll={onSelectAll}
                 onBulkAction={onBulkAction}
                 onToggleKanban={onToggleKanban}
+                focusedEmailIndex={focusedEmailIndex}
                 error={error}
               />
             </CardContent>
@@ -228,6 +231,7 @@ export function EmailLayout({
                 onSelectAll={onSelectAll}
                 onBulkAction={onBulkAction}
                 onToggleKanban={onToggleKanban}
+                focusedEmailIndex={focusedEmailIndex}
                 error={error}
               />
             </CardContent>

@@ -26,6 +26,7 @@ import {
   IEmailDetail,
   IPaginatedResponse,
 } from '@/types/api.types';
+import { useKeyboardShortcuts } from '@/hooks/use-keyboard-shortcuts';
 
 export default function MailFolderPage({
   params,
@@ -48,19 +49,18 @@ export default function MailFolderPage({
   const [selectedEmailId, setSelectedEmailId] = React.useState<string | null>(
     null
   );
+  const [focusedEmailIndex, setFocusedEmailIndex] = React.useState<number>(-1);
   const [chatMessages, setChatMessages] = React.useState<Message[]>([]);
   const [chatInput, setChatInput] = React.useState('');
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [size] = React.useState(20);
   const [composeOpen, setComposeOpen] = React.useState(false);
   const [isSearchMode, setIsSearchMode] = React.useState(false);
-  const [replyTo, setReplyTo] = React.useState<
-    | {
-        to: string[];
-        subject: string;
-        cc?: string[];
-      }
-    | undefined
+  const [composeMode, setComposeMode] = React.useState<
+    'compose' | 'reply' | 'replyAll' | 'forward'
+  >('compose');
+  const [originalEmail, setOriginalEmail] = React.useState<
+    IEmailDetail | undefined
   >(undefined);
 
   // Fetch mailboxes
@@ -229,40 +229,20 @@ export default function MailFolderPage({
   };
 
   const handleReply = (email: IEmailDetail) => {
-    setReplyTo({
-      to: [email.from],
-      subject: email.subject.startsWith('Re: ')
-        ? email.subject
-        : `Re: ${email.subject}`,
-    });
+    setOriginalEmail(email);
+    setComposeMode('reply');
     setComposeOpen(true);
   };
 
   const handleReplyAll = (email: IEmailDetail) => {
-    const allRecipients = [...email.to];
-    if (email.cc && email.cc.length > 0) {
-      allRecipients.push(...email.cc);
-    }
-    // Remove current user's email from recipients
-    const filteredRecipients = allRecipients.filter((r) => r !== user?.email);
-
-    setReplyTo({
-      to: [email.from, ...filteredRecipients],
-      subject: email.subject.startsWith('Re: ')
-        ? email.subject
-        : `Re: ${email.subject}`,
-      cc: email.cc || undefined,
-    });
+    setOriginalEmail(email);
+    setComposeMode('replyAll');
     setComposeOpen(true);
   };
 
   const handleForward = (email: IEmailDetail) => {
-    setReplyTo({
-      to: [],
-      subject: email.subject.startsWith('Fwd: ')
-        ? email.subject
-        : `Fwd: ${email.subject}`,
-    });
+    setOriginalEmail(email);
+    setComposeMode('forward');
     setComposeOpen(true);
   };
 
@@ -372,7 +352,8 @@ export default function MailFolderPage({
   };
 
   const handleComposeClick = () => {
-    setReplyTo(undefined);
+    setOriginalEmail(undefined);
+    setComposeMode('compose');
     setComposeOpen(true);
   };
 
@@ -469,6 +450,170 @@ export default function MailFolderPage({
     setIsSearchMode(false);
   };
 
+  // Keyboard navigation handlers
+  const handleNextEmail = React.useCallback(() => {
+    if (emails.length === 0) return;
+    setFocusedEmailIndex((prev) => {
+      const next = prev < emails.length - 1 ? prev + 1 : prev;
+      return next;
+    });
+  }, [emails.length]);
+
+  const handlePreviousEmail = React.useCallback(() => {
+    if (emails.length === 0) return;
+    setFocusedEmailIndex((prev) => {
+      const next = prev > 0 ? prev - 1 : 0;
+      return next;
+    });
+  }, [emails.length]);
+
+  const handleOpenFocusedEmail = React.useCallback(() => {
+    if (focusedEmailIndex >= 0 && focusedEmailIndex < emails.length) {
+      const email = emails[focusedEmailIndex];
+      handleEmailClick(email);
+    } else if (selectedEmailId) {
+      // If email detail is open, keep it open
+      return;
+    } else if (emails.length > 0) {
+      // Open first email if none focused
+      handleEmailClick(emails[0]);
+    }
+  }, [focusedEmailIndex, emails, selectedEmailId, handleEmailClick]);
+
+  const handleCloseEmail = React.useCallback(() => {
+    setSelectedEmailId(null);
+  }, []);
+
+  const handleMarkRead = React.useCallback(() => {
+    if (selectedEmailId) {
+      markAsReadMutation.mutate(selectedEmailId);
+    } else if (focusedEmailIndex >= 0 && focusedEmailIndex < emails.length) {
+      const email = emails[focusedEmailIndex];
+      if (!email.isRead) {
+        markAsReadMutation.mutate(email.id);
+      }
+    }
+  }, [selectedEmailId, focusedEmailIndex, emails, markAsReadMutation]);
+
+  const handleMarkUnread = React.useCallback(() => {
+    if (selectedEmailId) {
+      bulkActionMutation.mutate({
+        emailIds: [selectedEmailId],
+        action: 'unread',
+      });
+    } else if (focusedEmailIndex >= 0 && focusedEmailIndex < emails.length) {
+      const email = emails[focusedEmailIndex];
+      if (email.isRead) {
+        bulkActionMutation.mutate({
+          emailIds: [email.id],
+          action: 'unread',
+        });
+      }
+    }
+  }, [selectedEmailId, focusedEmailIndex, emails, bulkActionMutation]);
+
+  const handleToggleStarFocused = React.useCallback(() => {
+    if (selectedEmailId) {
+      const email = emails.find((e) => e.id === selectedEmailId);
+      if (email) {
+        handleStar(email.id, !email.isStarred);
+      }
+    } else if (focusedEmailIndex >= 0 && focusedEmailIndex < emails.length) {
+      const email = emails[focusedEmailIndex];
+      handleStar(email.id, !email.isStarred);
+    }
+  }, [selectedEmailId, focusedEmailIndex, emails, handleStar]);
+
+  const handleDeleteFocused = React.useCallback(() => {
+    if (selectedEmailId) {
+      handleDelete(selectedEmailId);
+    } else if (focusedEmailIndex >= 0 && focusedEmailIndex < emails.length) {
+      const email = emails[focusedEmailIndex];
+      handleDelete(email.id);
+      // Move focus to next email if available
+      if (focusedEmailIndex < emails.length - 1) {
+        setFocusedEmailIndex(focusedEmailIndex);
+      } else if (focusedEmailIndex > 0) {
+        setFocusedEmailIndex(focusedEmailIndex - 1);
+      }
+    }
+  }, [selectedEmailId, focusedEmailIndex, emails, handleDelete]);
+
+  const handleArchiveFocused = React.useCallback(() => {
+    if (selectedEmailId) {
+      handleArchive(selectedEmailId);
+    } else if (focusedEmailIndex >= 0 && focusedEmailIndex < emails.length) {
+      const email = emails[focusedEmailIndex];
+      handleArchive(email.id);
+      // Move focus to next email if available
+      if (focusedEmailIndex < emails.length - 1) {
+        setFocusedEmailIndex(focusedEmailIndex);
+      } else if (focusedEmailIndex > 0) {
+        setFocusedEmailIndex(focusedEmailIndex - 1);
+      }
+    }
+  }, [selectedEmailId, focusedEmailIndex, emails, handleArchive]);
+
+  const handleReplyFocused = React.useCallback(() => {
+    if (selectedEmail && selectedEmailId) {
+      handleReply(selectedEmail);
+    }
+  }, [selectedEmail, selectedEmailId, handleReply]);
+
+  const handleReplyAllFocused = React.useCallback(() => {
+    if (selectedEmail && selectedEmailId) {
+      handleReplyAll(selectedEmail);
+    }
+  }, [selectedEmail, selectedEmailId, handleReplyAll]);
+
+  const handleForwardFocused = React.useCallback(() => {
+    if (selectedEmail && selectedEmailId) {
+      handleForward(selectedEmail);
+    }
+  }, [selectedEmail, selectedEmailId, handleForward]);
+
+  const handleGoToInbox = React.useCallback(() => {
+    router.push(ROUTES.MAIL_FOLDER('inbox'));
+  }, [router]);
+
+  const handleGoToSent = React.useCallback(() => {
+    router.push(ROUTES.MAIL_FOLDER('sent'));
+  }, [router]);
+
+  const handleGoToDrafts = React.useCallback(() => {
+    router.push(ROUTES.MAIL_FOLDER('drafts'));
+  }, [router]);
+
+  // Reset focused index when emails change
+  React.useEffect(() => {
+    if (focusedEmailIndex >= emails.length) {
+      setFocusedEmailIndex(Math.max(0, emails.length - 1));
+    }
+  }, [emails.length, focusedEmailIndex]);
+
+  // Set up keyboard shortcuts
+  useKeyboardShortcuts({
+    onNextEmail: handleNextEmail,
+    onPreviousEmail: handlePreviousEmail,
+    onOpenEmail: handleOpenFocusedEmail,
+    onCloseEmail: handleCloseEmail,
+    onMarkRead: handleMarkRead,
+    onMarkUnread: handleMarkUnread,
+    onToggleStar: handleToggleStarFocused,
+    onDelete: handleDeleteFocused,
+    onArchive: handleArchiveFocused,
+    onReply: handleReplyFocused,
+    onReplyAll: handleReplyAllFocused,
+    onForward: handleForwardFocused,
+    onCompose: handleComposeClick,
+    onSearch: handleOpenSearch,
+    onGoToInbox: handleGoToInbox,
+    onGoToSent: handleGoToSent,
+    onGoToDrafts: handleGoToDrafts,
+    disabled: isSearchMode || composeOpen,
+    enabled: !isSearchMode && !composeOpen,
+  });
+
   const handleViewEmailFromSearch = (emailId: string) => {
     setSelectedEmailId(emailId);
     setIsSearchMode(false);
@@ -523,6 +668,7 @@ export default function MailFolderPage({
           onSelectAll={handleSelectAll}
           onBulkAction={handleBulkAction}
           onToggleKanban={handleToggleKanban}
+          focusedEmailIndex={focusedEmailIndex}
           selectedEmail={selectedEmail || undefined}
           onBack={() => setSelectedEmailId(null)}
           onReply={handleReply}
@@ -566,10 +712,12 @@ export default function MailFolderPage({
         onOpenChange={(open) => {
           setComposeOpen(open);
           if (!open) {
-            setReplyTo(undefined);
+            setOriginalEmail(undefined);
+            setComposeMode('compose');
           }
         }}
-        replyTo={replyTo}
+        mode={composeMode}
+        originalEmail={originalEmail}
       />
     </div>
   );

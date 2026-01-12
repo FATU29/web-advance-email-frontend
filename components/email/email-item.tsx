@@ -14,6 +14,7 @@ import { IEmailListItem } from '@/types/api.types';
 export interface EmailItemProps {
   email: IEmailListItem;
   isSelected?: boolean;
+  isFocused?: boolean;
   onSelect?: (emailId: string, selected: boolean) => void;
   onClick?: (email: IEmailListItem) => void;
   isCompact?: boolean;
@@ -22,6 +23,7 @@ export interface EmailItemProps {
 export function EmailItem({
   email,
   isSelected = false,
+  isFocused = false,
   onSelect,
   onClick,
   isCompact = false,
@@ -105,11 +107,19 @@ export function EmailItem({
         'group relative cursor-pointer rounded-none border-x-0 border-t-0 transition-colors',
         'hover:bg-accent/50',
         isSelected && 'bg-accent',
-        isUnread && 'bg-primary/5 border-l-4 border-l-primary'
+        isUnread && 'bg-primary/5 border-l-4 border-l-primary',
+        isFocused &&
+          'bg-primary/10 border-l-4 border-l-primary ring-2 ring-primary/30'
       )}
       onClick={handleClick}
     >
-      <CardContent className="p-3 md:p-4">
+      <CardContent
+        className={cn(
+          'p-3 md:p-4',
+          isFocused &&
+            'bg-primary/5 border-l-4 border-l-primary ring-2 ring-primary/20'
+        )}
+      >
         <div className="flex items-start gap-2 md:gap-3">
           {/* Checkbox and Unread Indicator */}
           <div

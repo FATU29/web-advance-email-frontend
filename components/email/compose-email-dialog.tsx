@@ -14,23 +14,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { useSendEmailMutation } from '@/hooks/use-email-mutations';
-import { ISendEmailParams } from '@/types/api.types';
+import {
+  useSendEmailMutation,
+  useReplyEmailMutation,
+} from '@/hooks/use-email-mutations';
+import { ISendEmailParams, IEmailDetail } from '@/types/api.types';
+
+type ComposeMode = 'compose' | 'reply' | 'replyAll' | 'forward';
 
 interface ComposeEmailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  replyTo?: {
-    to: string[];
-    subject: string;
-    cc?: string[];
-  };
+  mode?: ComposeMode;
+  originalEmail?: IEmailDetail;
 }
 
 export function ComposeEmailDialog({
   open,
   onOpenChange,
-  replyTo,
+  mode = 'compose',
+  originalEmail,
 }: ComposeEmailDialogProps) {
   const [to, setTo] = React.useState('');
   const [cc, setCc] = React.useState('');
@@ -41,31 +44,105 @@ export function ComposeEmailDialog({
   const [showBcc, setShowBcc] = React.useState(false);
 
   const sendEmailMutation = useSendEmailMutation();
+  const replyEmailMutation = useReplyEmailMutation();
 
-  // Pre-fill fields when replying
+  // Pre-fill fields based on mode
   React.useEffect(() => {
-    if (replyTo) {
-      setTo(replyTo.to.join(', '));
-      setSubject(
-        replyTo.subject.startsWith('Re: ')
-          ? replyTo.subject
-          : `Re: ${replyTo.subject}`
-      );
-      if (replyTo.cc && replyTo.cc.length > 0) {
-        setCc(replyTo.cc.join(', '));
-        setShowCc(true);
+    if (!open || !originalEmail) {
+      // Reset when dialog closes
+      if (!open) {
+        setTo('');
+        setCc('');
+        setBcc('');
+        setSubject('');
+        setBody('');
+        setShowCc(false);
+        setShowBcc(false);
       }
+      return;
     }
-  }, [replyTo]);
+
+    if (mode === 'reply') {
+      // Reply: To = original sender
+      setTo(originalEmail.from);
+      setSubject(
+        originalEmail.subject.startsWith('Re: ')
+          ? originalEmail.subject
+          : `Re: ${originalEmail.subject}`
+      );
+      setCc('');
+      setBcc('');
+      setShowCc(false);
+      setShowBcc(false);
+      setBody('');
+    } else if (mode === 'replyAll') {
+      // Reply All: To = original sender + all recipients (excluding current user)
+      const allRecipients = [...originalEmail.to];
+      if (originalEmail.cc && originalEmail.cc.length > 0) {
+        allRecipients.push(...originalEmail.cc);
+      }
+      // Note: We can't filter current user email here without user context
+      // Backend will handle this properly
+      setTo([originalEmail.from, ...allRecipients].join(', '));
+      setSubject(
+        originalEmail.subject.startsWith('Re: ')
+          ? originalEmail.subject
+          : `Re: ${originalEmail.subject}`
+      );
+      if (originalEmail.cc && originalEmail.cc.length > 0) {
+        setCc(originalEmail.cc.join(', '));
+        setShowCc(true);
+      } else {
+        setCc('');
+        setShowCc(false);
+      }
+      setBcc('');
+      setShowBcc(false);
+      setBody('');
+    } else if (mode === 'forward') {
+      // Forward: Empty To, Fwd: prefix, include original email in body
+      setTo('');
+      setSubject(
+        originalEmail.subject.startsWith('Fwd: ')
+          ? originalEmail.subject
+          : `Fwd: ${originalEmail.subject}`
+      );
+      setCc('');
+      setBcc('');
+      setShowCc(false);
+      setShowBcc(false);
+
+      // Include original email content in body
+      const forwardHeader = `\n\n---------- Forwarded message ----------\nFrom: ${originalEmail.fromName || originalEmail.from} <${originalEmail.from}>\nDate: ${new Date(originalEmail.receivedAt).toLocaleString()}\nSubject: ${originalEmail.subject}\nTo: ${originalEmail.to.join(', ')}\n`;
+      const forwardBody = originalEmail.body ? `\n\n${originalEmail.body}` : '';
+      setBody(forwardHeader + forwardBody);
+    } else {
+      // Compose: Empty fields
+      setTo('');
+      setCc('');
+      setBcc('');
+      setSubject('');
+      setBody('');
+      setShowCc(false);
+      setShowBcc(false);
+    }
+  }, [open, mode, originalEmail]);
 
   const handleSend = async () => {
     // Validate required fields
-    if (!to.trim()) {
+    // For reply/replyAll, backend handles recipients automatically
+    if (
+      mode !== 'forward' &&
+      mode !== 'reply' &&
+      mode !== 'replyAll' &&
+      !to.trim()
+    ) {
       toast.error('Please enter at least one recipient');
       return;
     }
 
-    if (!subject.trim()) {
+    // For forward and compose, subject is required
+    if ((mode === 'forward' || mode === 'compose') && !subject.trim()) {
       toast.error('Please enter a subject');
       return;
     }
@@ -75,6 +152,32 @@ export function ComposeEmailDialog({
       return;
     }
 
+    // For reply/replyAll, use reply API
+    if ((mode === 'reply' || mode === 'replyAll') && originalEmail) {
+      replyEmailMutation.mutate(
+        {
+          emailId: originalEmail.id,
+          params: {
+            body: body.trim(),
+            replyAll: mode === 'replyAll',
+          },
+        },
+        {
+          onSuccess: () => {
+            toast.success('Reply sent successfully');
+            handleClose();
+          },
+          onError: (error) => {
+            toast.error(
+              error instanceof Error ? error.message : 'Failed to send reply'
+            );
+          },
+        }
+      );
+      return;
+    }
+
+    // For forward and compose, use send API
     // Parse email addresses
     const parseEmails = (str: string): string[] => {
       return str
@@ -107,7 +210,11 @@ export function ComposeEmailDialog({
 
     sendEmailMutation.mutate(params, {
       onSuccess: () => {
-        toast.success('Email sent successfully');
+        toast.success(
+          mode === 'forward'
+            ? 'Email forwarded successfully'
+            : 'Email sent successfully'
+        );
         handleClose();
       },
       onError: (error) => {
@@ -147,7 +254,13 @@ export function ComposeEmailDialog({
         <DialogHeader className="px-6 pt-6 pb-4 space-y-0">
           <div className="flex items-center justify-between">
             <DialogTitle className="text-xl font-semibold">
-              {replyTo ? 'Reply' : 'New Message'}
+              {mode === 'reply'
+                ? 'Reply'
+                : mode === 'replyAll'
+                  ? 'Reply All'
+                  : mode === 'forward'
+                    ? 'Forward'
+                    : 'New Message'}
             </DialogTitle>
             <Button
               variant="ghost"
@@ -177,6 +290,8 @@ export function ComposeEmailDialog({
                 onChange={(e) => setTo(e.target.value)}
                 placeholder="recipient@example.com, another@example.com"
                 className="flex-1"
+                readOnly={mode === 'reply' || mode === 'replyAll'}
+                disabled={mode === 'reply' || mode === 'replyAll'}
               />
               {!showCc && (
                 <Button
@@ -332,18 +447,28 @@ export function ComposeEmailDialog({
             <Button
               type="button"
               onClick={handleSend}
-              disabled={sendEmailMutation.isPending}
+              disabled={
+                sendEmailMutation.isPending || replyEmailMutation.isPending
+              }
               className="gap-2"
             >
-              {sendEmailMutation.isPending ? (
+              {sendEmailMutation.isPending || replyEmailMutation.isPending ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Sending...
+                  {mode === 'reply' || mode === 'replyAll'
+                    ? 'Sending reply...'
+                    : mode === 'forward'
+                      ? 'Forwarding...'
+                      : 'Sending...'}
                 </>
               ) : (
                 <>
                   <Send className="h-4 w-4" />
-                  Send
+                  {mode === 'reply' || mode === 'replyAll'
+                    ? 'Send Reply'
+                    : mode === 'forward'
+                      ? 'Forward'
+                      : 'Send'}
                 </>
               )}
             </Button>

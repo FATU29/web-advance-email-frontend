@@ -29,6 +29,7 @@ export interface EmailListProps extends MailListProps {
     emailIds: string[]
   ) => void;
   onToggleKanban?: () => void;
+  focusedEmailIndex?: number;
   error?: string | null;
 }
 
@@ -44,6 +45,7 @@ export function EmailList({
   onSelectAll,
   onBulkAction,
   onToggleKanban,
+  focusedEmailIndex = -1,
   isCompact: isCompactProp = false,
   error = null,
 }: EmailListProps) {
@@ -56,9 +58,99 @@ export function EmailList({
   const isMobile = useIsMobile();
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
   const isLoadingMoreRef = React.useRef(false);
+  const emailItemRefs = React.useRef<Map<number, HTMLDivElement>>(new Map());
 
   // Auto set compact mode on mobile
   const isCompact = isCompactProp || isMobile;
+
+  //Init util function
+  const filteredAndSortedEmails = React.useMemo(() => {
+    let filtered = [...emails];
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (email) =>
+          email.subject.toLowerCase().includes(query) ||
+          email.fromName?.toLowerCase().includes(query) ||
+          email.from.toLowerCase().includes(query) ||
+          email.preview.toLowerCase().includes(query)
+      );
+    }
+
+    // Filter by read/unread
+    if (filterBy === 'unread') {
+      filtered = filtered.filter((email) => !email.isRead);
+    } else if (filterBy === 'read') {
+      filtered = filtered.filter((email) => email.isRead);
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'date-desc':
+          return (
+            new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
+          );
+        case 'date-asc':
+          return (
+            new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime()
+          );
+        case 'sender-asc':
+          return (a.fromName || a.from).localeCompare(b.fromName || b.from);
+        case 'sender-desc':
+          return (b.fromName || b.from).localeCompare(a.fromName || a.from);
+        case 'subject-asc':
+          return a.subject.localeCompare(b.subject);
+        case 'subject-desc':
+          return b.subject.localeCompare(a.subject);
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  }, [emails, searchQuery, sortBy, filterBy]);
+
+  // Scroll focused email into view
+  React.useEffect(() => {
+    if (
+      focusedEmailIndex >= 0 &&
+      focusedEmailIndex < filteredAndSortedEmails.length
+    ) {
+      const emailItemElement = emailItemRefs.current.get(focusedEmailIndex);
+      if (emailItemElement) {
+        // Find the scrollable viewport
+        const findViewport = (): HTMLElement | null => {
+          return (scrollContainerRef.current?.querySelector(
+            '[data-slot="scroll-area-viewport"]'
+          ) ||
+            scrollContainerRef.current?.querySelector(
+              '[data-radix-scroll-area-viewport]'
+            ) ||
+            null) as HTMLElement | null;
+        };
+
+        const viewport = findViewport();
+        if (viewport) {
+          const itemRect = emailItemElement.getBoundingClientRect();
+          const viewportRect = viewport.getBoundingClientRect();
+
+          // Check if item is outside viewport
+          if (
+            itemRect.top < viewportRect.top ||
+            itemRect.bottom > viewportRect.bottom
+          ) {
+            emailItemElement.scrollIntoView({
+              behavior: 'smooth',
+              block: 'nearest',
+            });
+          }
+        }
+      }
+    }
+  }, [focusedEmailIndex, filteredAndSortedEmails.length]);
 
   //Init effect hook
   React.useEffect(() => {
@@ -167,56 +259,6 @@ export function EmailList({
     }
     onSelectAll?.(checked);
   };
-
-  //Init util function
-  const filteredAndSortedEmails = React.useMemo(() => {
-    let filtered = [...emails];
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (email) =>
-          email.subject.toLowerCase().includes(query) ||
-          email.fromName?.toLowerCase().includes(query) ||
-          email.from.toLowerCase().includes(query) ||
-          email.preview.toLowerCase().includes(query)
-      );
-    }
-
-    // Filter by read/unread
-    if (filterBy === 'unread') {
-      filtered = filtered.filter((email) => !email.isRead);
-    } else if (filterBy === 'read') {
-      filtered = filtered.filter((email) => email.isRead);
-    }
-
-    // Sort
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case 'date-desc':
-          return (
-            new Date(b.receivedAt).getTime() - new Date(a.receivedAt).getTime()
-          );
-        case 'date-asc':
-          return (
-            new Date(a.receivedAt).getTime() - new Date(b.receivedAt).getTime()
-          );
-        case 'sender-asc':
-          return (a.fromName || a.from).localeCompare(b.fromName || b.from);
-        case 'sender-desc':
-          return (b.fromName || b.from).localeCompare(a.fromName || a.from);
-        case 'subject-asc':
-          return a.subject.localeCompare(b.subject);
-        case 'subject-desc':
-          return b.subject.localeCompare(a.subject);
-        default:
-          return 0;
-      }
-    });
-
-    return filtered;
-  }, [emails, searchQuery, sortBy, filterBy]);
 
   //Render loading state
   if (loading) {
@@ -383,15 +425,26 @@ export function EmailList({
               </div>
             ) : (
               <>
-                {filteredAndSortedEmails.map((email) => (
-                  <EmailItem
+                {filteredAndSortedEmails.map((email, index) => (
+                  <div
                     key={email.id}
-                    email={email}
-                    isSelected={localSelected.has(email.id)}
-                    onSelect={handleEmailSelect}
-                    onClick={onEmailClick}
-                    isCompact={isCompact}
-                  />
+                    ref={(el) => {
+                      if (el) {
+                        emailItemRefs.current.set(index, el);
+                      } else {
+                        emailItemRefs.current.delete(index);
+                      }
+                    }}
+                  >
+                    <EmailItem
+                      email={email}
+                      isSelected={localSelected.has(email.id)}
+                      isFocused={focusedEmailIndex === index}
+                      onSelect={handleEmailSelect}
+                      onClick={onEmailClick}
+                      isCompact={isCompact}
+                    />
+                  </div>
                 ))}
                 {isLoadingMore && (
                   <div className="flex items-center justify-center py-6">

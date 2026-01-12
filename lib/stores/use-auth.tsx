@@ -29,9 +29,11 @@ import {
   IResetPasswordParams,
   IChangePasswordParams,
 } from '@/types/api.types';
+import * as React from 'react';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { AxiosError } from 'axios';
+import { getAuthBroadcastChannel } from '@/utils/broadcast-channel';
 
 //==================== REGION TYPES ====================
 interface AuthState {
@@ -93,6 +95,8 @@ const useAuth = create<AuthStore>()(
               isLoading: false,
               error: null,
             });
+            // Broadcast login to other tabs
+            getAuthBroadcastChannel().broadcastLogin(user.id);
           } else {
             throw new Error(response.data.message || 'Login failed');
           }
@@ -156,6 +160,8 @@ const useAuth = create<AuthStore>()(
               error: null,
               pendingVerificationEmail: null,
             });
+            // Broadcast login to other tabs
+            getAuthBroadcastChannel().broadcastLogin(user.id);
           } else {
             throw new Error(
               response.data.message || 'Email verification failed'
@@ -214,6 +220,8 @@ const useAuth = create<AuthStore>()(
               isLoading: false,
               error: null,
             });
+            // Broadcast login to other tabs
+            getAuthBroadcastChannel().broadcastLogin(user.id);
           } else {
             throw new Error(response.data.message || 'Google sign-in failed');
           }
@@ -248,6 +256,8 @@ const useAuth = create<AuthStore>()(
             isLoading: false,
             error: null,
           });
+          // Broadcast logout to other tabs
+          getAuthBroadcastChannel().broadcastLogout();
         }
       },
 
@@ -461,6 +471,51 @@ const useAuth = create<AuthStore>()(
 // Selector để lấy isAuthenticated - luôn kiểm tra token thực tế
 export const useIsAuthenticated = () => {
   return useAuth((state) => state.getIsAuthenticated());
+};
+
+// Hook to set up BroadcastChannel listener for multi-tab logout sync
+// This should be called once in the app root (e.g., in layout.tsx or AuthProvider)
+export const useAuthBroadcastSync = () => {
+  React.useEffect(() => {
+    const channel = getAuthBroadcastChannel();
+    const listenerId = 'auth-store-listener';
+
+    // Listen for logout broadcasts from other tabs
+    channel.onMessage(listenerId, (message) => {
+      if (message.type === 'LOGOUT') {
+        // Another tab logged out - sync this tab
+        // Don't call logout() API or broadcast again to avoid loops
+        console.log(
+          '🔄 Logout broadcast received from another tab - syncing...'
+        );
+
+        // Clear tokens and state directly (without API call or broadcast)
+        removeTokens();
+        useAuth.setState({
+          user: null,
+          isLoading: false,
+          error: null,
+          pendingVerificationEmail: null,
+        });
+
+        // Clear query cache if React Query is available
+        if (typeof window !== 'undefined') {
+          // Redirect to login page to ensure clean state
+          // Use replace to avoid adding to history
+          if (window.location.pathname !== '/auth/login') {
+            window.location.replace('/auth/login');
+          }
+        }
+      }
+      // Note: We don't handle LOGIN broadcasts here as each tab should
+      // authenticate independently through the normal flow
+    });
+
+    // Cleanup on unmount
+    return () => {
+      channel.offMessage(listenerId);
+    };
+  }, []);
 };
 
 export default useAuth;

@@ -16,6 +16,7 @@ import {
   MoreVertical,
   Trash2,
   Star,
+  ExternalLink,
 } from 'lucide-react';
 
 import {
@@ -532,6 +533,20 @@ export function EmailDetail({
             </CardTitle>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            {/* Open in Gmail link */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                // Gmail URL format: https://mail.google.com/mail/u/0/#inbox/{messageId}
+                const gmailUrl = `https://mail.google.com/mail/u/0/#inbox/${email.id}`;
+                window.open(gmailUrl, '_blank', 'noopener,noreferrer');
+              }}
+              className="size-8"
+              title="Open in Gmail"
+            >
+              <ExternalLink className="size-4" />
+            </Button>
             {onStar && (
               <Button
                 variant="ghost"
