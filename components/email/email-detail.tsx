@@ -572,7 +572,7 @@ export function EmailDetail({
       {/* Content */}
       <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
         <ScrollArea className="h-full">
-          <div className="p-6">
+          <div className="p-6 max-w-full overflow-x-hidden">
             {/* Email Info */}
             <div className="mb-6 flex items-start gap-4">
               <Avatar className="size-12 shrink-0">
@@ -662,7 +662,7 @@ export function EmailDetail({
             )}
 
             {/* Email Body */}
-            <div className="email-body-container min-h-[200px]">
+            <div className="email-body-container min-h-[200px] max-w-full overflow-x-hidden break-words">
               {email.body ? (
                 (() => {
                   const contentType = detectContentType(email.body);
@@ -674,8 +674,8 @@ export function EmailDetail({
                     // Render as HTML (existing implementation)
                     return (
                       <div
-                        className="email-body-content text-sm leading-relaxed 
-                        [&_p]:mb-4 [&_p]:text-foreground 
+                        className="email-body-content text-sm leading-relaxed max-w-full overflow-x-hidden break-words
+                        [&_p]:mb-4 [&_p]:text-foreground [&_p]:break-words 
                         [&_h1]:text-xl [&_h1]:font-bold [&_h1]:mb-3 [&_h1]:mt-6 [&_h1]:text-foreground 
                         [&_h2]:text-lg [&_h2]:font-bold [&_h2]:mb-2 [&_h2]:mt-5 [&_h2]:text-foreground 
                         [&_h3]:text-base [&_h3]:font-semibold [&_h3]:mb-2 [&_h3]:mt-4 [&_h3]:text-foreground 
@@ -694,14 +694,14 @@ export function EmailDetail({
                         [&_ins]:underline [&_ins]:text-foreground 
                         [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-900 [&_mark]:px-1 [&_mark]:rounded 
                         [&_code]:bg-muted [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-foreground [&_code]:text-xs [&_code]:font-mono 
-                        [&_pre]:bg-muted [&_pre]:p-4 [&_pre]:rounded-md [&_pre]:overflow-x-auto [&_pre]:text-foreground [&_pre]:my-4 [&_pre]:font-mono 
+                        [&_pre]:bg-muted [&_pre]:p-4 [&_pre]:rounded-md [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_pre]:text-foreground [&_pre]:my-4 [&_pre]:font-mono 
                         [&_kbd]:bg-muted [&_kbd]:px-2 [&_kbd]:py-1 [&_kbd]:rounded [&_kbd]:text-xs [&_kbd]:font-mono [&_kbd]:border [&_kbd]:border-border 
-                        [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-md [&_img]:my-4 
+                        [&_img]:max-w-full [&_img]:w-auto [&_img]:h-auto [&_img]:rounded-md [&_img]:my-4 [&_img]:object-contain 
                         [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:mb-4 [&_ul]:text-foreground 
                         [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:mb-4 [&_ol]:text-foreground 
                         [&_li]:mb-1 [&_li]:text-foreground 
                         [&_dl]:mb-4 [&_dt]:font-semibold [&_dt]:mb-1 [&_dd]:ml-6 [&_dd]:mb-2 
-                        [&_table]:w-full [&_table]:border-collapse [&_table]:my-4 [&_table]:text-foreground 
+                        [&_table]:max-w-full [&_table]:border-collapse [&_table]:my-4 [&_table]:text-foreground [&_table]:table-auto 
                         [&_th]:border [&_th]:border-border [&_th]:p-2 [&_th]:bg-muted [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground 
                         [&_td]:border [&_td]:border-border [&_td]:p-2 [&_td]:text-foreground 
                         [&_caption]:text-sm [&_caption]:text-muted-foreground [&_caption]:mb-2 

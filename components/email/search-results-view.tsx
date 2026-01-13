@@ -37,13 +37,13 @@ export function SearchResultsView({
   const [searchQuery, setSearchQuery] = React.useState('');
   const [activeQuery, setActiveQuery] = React.useState('');
   const [includeBody] = React.useState(true);
-  const [searchMode, setSearchMode] = React.useState<SearchMode>('both');
+  const [searchMode, setSearchMode] = React.useState<SearchMode>('semantic');
   const isMobile = useIsMobile();
 
   // Check semantic search availability
   const { data: semanticStatus } = useSemanticSearchStatusQuery();
 
-  // Fuzzy search query (enabled for 'fuzzy' or 'both' mode)
+  // Fuzzy search query (enabled for 'fuzzy' mode only)
   const {
     data: fuzzySearchResults,
     isLoading: isFuzzyLoading,
@@ -52,8 +52,7 @@ export function SearchResultsView({
     activeQuery,
     50,
     includeBody,
-    activeQuery.trim() !== '' &&
-      (searchMode === 'fuzzy' || searchMode === 'both')
+    activeQuery.trim() !== '' && searchMode === 'fuzzy'
   );
 
   // Semantic search mutation
@@ -64,53 +63,7 @@ export function SearchResultsView({
 
   // Determine which results to use
   const searchResults = React.useMemo(() => {
-    if (searchMode === 'both') {
-      // Combine results from both fuzzy and semantic search
-      const fuzzyResults = fuzzySearchResults?.results || [];
-      const semanticResults = semanticSearchMutation.data?.results || [];
-
-      // Create a map to deduplicate by emailId
-      const resultsMap = new Map<string, IKanbanEmail>();
-
-      // Add fuzzy results first
-      fuzzyResults.forEach((result) => {
-        resultsMap.set(result.emailId, result);
-      });
-
-      // Add semantic results (may override fuzzy if same emailId)
-      semanticResults.forEach((result) => {
-        // Find if we already have this email from fuzzy search
-        const existing = resultsMap.get(result.emailId);
-        resultsMap.set(result.emailId, {
-          id: existing?.id || `semantic_${result.emailId}`,
-          emailId: result.emailId,
-          columnId: result.columnId,
-          orderInColumn: existing?.orderInColumn || 0,
-          subject: result.subject,
-          fromEmail: result.fromEmail,
-          fromName: result.fromName,
-          preview: result.preview,
-          receivedAt: result.receivedAt,
-          isRead: result.read,
-          isStarred: result.starred,
-          hasAttachments: result.hasAttachments,
-          summary: result.summary,
-          score: result.similarityScore,
-          matchedFields: ['semantic'],
-          createdAt: result.receivedAt,
-          updatedAt: result.receivedAt,
-          snoozed: false,
-        } as IKanbanEmail);
-      });
-
-      const combinedResults = Array.from(resultsMap.values());
-
-      return {
-        query: activeQuery,
-        totalResults: combinedResults.length,
-        results: combinedResults,
-      };
-    } else if (searchMode === 'semantic' && semanticSearchMutation.data) {
+    if (searchMode === 'semantic' && semanticSearchMutation.data) {
       // Convert semantic search results to IKanbanEmail format
       return {
         query: semanticSearchMutation.data.query,
@@ -148,17 +101,9 @@ export function SearchResultsView({
   ]);
 
   const isLoading =
-    searchMode === 'both'
-      ? isFuzzyLoading || semanticSearchMutation.isPending
-      : searchMode === 'fuzzy'
-        ? isFuzzyLoading
-        : semanticSearchMutation.isPending;
+    searchMode === 'fuzzy' ? isFuzzyLoading : semanticSearchMutation.isPending;
   const error =
-    searchMode === 'both'
-      ? fuzzyError || semanticSearchMutation.error
-      : searchMode === 'fuzzy'
-        ? fuzzyError
-        : semanticSearchMutation.error;
+    searchMode === 'fuzzy' ? fuzzyError : semanticSearchMutation.error;
 
   const handleSearch = (query: string) => {
     const trimmedQuery = query.trim();
@@ -166,8 +111,8 @@ export function SearchResultsView({
 
     setActiveQuery(trimmedQuery);
 
-    // Perform semantic search if mode is 'semantic' or 'both'
-    if (searchMode === 'semantic' || searchMode === 'both') {
+    // Perform semantic search if mode is 'semantic'
+    if (searchMode === 'semantic') {
       // Perform semantic search with auto-generate
       // Will automatically generate embeddings for emails that don't have them yet
       // NOTE: Set to false to test semantic search without generating embeddings
@@ -200,7 +145,6 @@ export function SearchResultsView({
           },
           onError: (error) => {
             // Handle semantic search not available (OpenAI API key not configured)
-            // Only fallback if mode is 'semantic' (not 'both', as user wants to see both results)
             if (
               error instanceof Error &&
               (error.message.includes('Semantic search is not available') ||
@@ -212,13 +156,8 @@ export function SearchResultsView({
                   'AI search is not available. Please use text search.'
                 );
                 setSearchMode('fuzzy');
-                // Fallback to fuzzy search only if mode was 'semantic'
+                // Fallback to fuzzy search
                 setActiveQuery(trimmedQuery);
-              } else {
-                // In 'both' mode, just show error but don't fallback
-                toast.error(
-                  'AI search is not available. Showing text search results only.'
-                );
               }
             } else if (
               error instanceof Error &&
@@ -236,7 +175,7 @@ export function SearchResultsView({
         }
       );
     }
-    // Fuzzy search is handled automatically by the query hook (for 'fuzzy' or 'both' mode)
+    // Fuzzy search is handled automatically by the query hook for 'fuzzy' mode
   };
 
   const handleSearchModeChange = (mode: SearchMode) => {
@@ -313,24 +252,6 @@ export function SearchResultsView({
               semanticStatus?.available ? handleSearchModeChange : undefined
             }
           />
-          {searchMode === 'both' && semanticStatus?.available && (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 px-3 py-2 bg-linear-to-r from-blue-50 to-purple-50 dark:from-blue-950/20 dark:to-purple-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
-              <div className="flex items-center gap-2 text-xs font-medium text-blue-700 dark:text-blue-300">
-                <Search className="h-3 w-3 sm:h-4 sm:w-4 shrink-0" />
-                <span className="text-[11px] sm:text-xs">
-                  Both Text & AI Search
-                </span>
-              </div>
-              <Badge variant="secondary" className="text-[10px] sm:text-xs">
-                Combined
-              </Badge>
-              {!isMobile && (
-                <div className="text-xs text-blue-600 dark:text-blue-400 sm:ml-auto">
-                  💡 Showing results from both search methods
-                </div>
-              )}
-            </div>
-          )}
           {searchMode === 'semantic' && semanticStatus?.available && (
             <div className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
               <div className="flex items-center gap-2 text-xs font-medium text-purple-700 dark:text-purple-300">
@@ -359,25 +280,23 @@ export function SearchResultsView({
                 {activeQuery}
               </Badge>
             </div>
-            {(searchMode === 'semantic' || searchMode === 'both') &&
-              semanticSearchMutation.data && (
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs gap-1">
-                    <Sparkles className="h-3 w-3" />
-                    {semanticSearchMutation.data.processingTimeMs}ms
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    📊 {semanticSearchMutation.data.emailsWithEmbeddings}{' '}
+            {searchMode === 'semantic' && semanticSearchMutation.data && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  {semanticSearchMutation.data.processingTimeMs}ms
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  📊 {semanticSearchMutation.data.emailsWithEmbeddings} indexed
+                </Badge>
+                {semanticSearchMutation.data.emailsWithoutEmbeddings > 0 && (
+                  <Badge variant="destructive" className="text-xs">
+                    ⚠️ {semanticSearchMutation.data.emailsWithoutEmbeddings} not
                     indexed
                   </Badge>
-                  {semanticSearchMutation.data.emailsWithoutEmbeddings > 0 && (
-                    <Badge variant="destructive" className="text-xs">
-                      ⚠️ {semanticSearchMutation.data.emailsWithoutEmbeddings}{' '}
-                      not indexed
-                    </Badge>
-                  )}
-                </div>
-              )}
+                )}
+              </div>
+            )}
             {searchMode === 'both' && fuzzySearchResults && (
               <div className="flex items-center gap-2">
                 <Badge variant="outline" className="text-xs">
