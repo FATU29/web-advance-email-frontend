@@ -688,24 +688,6 @@ export default function MailFolderPage({
         />
       )}
 
-      {/* Sticky Chat Button */}
-      <div className="fixed bottom-4 right-4 z-50">
-        <ChatDialog
-          triggerSize="icon"
-          triggerVariant="default"
-          triggerClassName="h-14 w-14 rounded-full shadow-lg"
-          messages={chatMessages}
-          handleSubmit={handleChatSubmit}
-          input={chatInput}
-          handleInputChange={handleChatInputChange}
-          isGenerating={isGenerating}
-          stop={handleChatStop}
-          setMessages={setChatMessages}
-          append={handleChatAppend}
-          suggestions={chatSuggestions}
-        />
-      </div>
-
       {/* Compose Email Dialog */}
       <ComposeEmailDialog
         open={composeOpen}

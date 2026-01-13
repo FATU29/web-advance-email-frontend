@@ -396,18 +396,6 @@ export function SearchBar({
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           <div className="flex items-center gap-1 border rounded-md p-1 bg-muted/50">
             <Button
-              variant={searchMode === 'both' ? 'secondary' : 'ghost'}
-              size="sm"
-              className={cn(
-                'flex-1 sm:flex-none h-9 sm:h-8 px-3 text-xs',
-                isMobile && 'min-w-0'
-              )}
-              onClick={() => onSearchModeChange('both')}
-              title="Search with both text and AI semantic search"
-            >
-              {isMobile ? 'Both' : 'Both'}
-            </Button>
-            <Button
               variant={searchMode === 'semantic' ? 'secondary' : 'ghost'}
               size="sm"
               className={cn(

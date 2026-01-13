@@ -8,18 +8,21 @@ import { List, RefreshCw, Search, Settings } from 'lucide-react';
 import { Sidebar } from '@/components/email/sidebar';
 import { EmailDetail } from '@/components/email/email-detail';
 import { KanbanBoard } from '@/components/email/kanban-board';
+import { KanbanCard } from '@/components/email/kanban-card';
 import { KanbanFilters } from '@/components/email/kanban-filters';
 import { SnoozeDialog } from '@/components/email/snooze-dialog';
 import { SearchResultsView } from '@/components/email/search-results-view';
 import { KanbanSettingsDialog } from '@/components/email/kanban-settings-dialog';
 import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+
 import { useIsMobile } from '@/hooks/use-mobile';
 import useAuth from '@/lib/stores/use-auth';
 import {
@@ -76,6 +79,7 @@ export default function KanbanPage() {
     Set<'unread' | 'attachments' | 'starred'>
   >(new Set());
   const [isSearchMode, setIsSearchMode] = React.useState(false);
+  const [selectedColumnId, setSelectedColumnId] = React.useState<string>('');
 
   //Init effect hook - Prevent hydration mismatch with @dnd-kit
   React.useEffect(() => {
@@ -227,6 +231,16 @@ export default function KanbanPage() {
   const snoozeEmailKanbanMutation = useSnoozeEmailKanbanMutation();
   const unsnoozeEmailMutation = useUnsnoozeEmailMutation();
   const generateSummaryMutation = useGenerateSummaryMutation();
+
+  // Set initial selected column for mobile
+  React.useEffect(() => {
+    if (isMobile && kanbanBoardData && !selectedColumnId) {
+      const firstColumn = kanbanBoardData.columns[0];
+      if (firstColumn) {
+        setSelectedColumnId(firstColumn.id);
+      }
+    }
+  }, [isMobile, kanbanBoardData, selectedColumnId]);
 
   // Check for expired snoozes and restore them
   React.useEffect(() => {
@@ -431,7 +445,7 @@ export default function KanbanPage() {
     });
   }, [emails]);
 
-  //Render mobile message
+  //Render mobile kanban view
   if (isMobile) {
     return (
       <div className="flex h-screen flex-col">
@@ -472,37 +486,266 @@ export default function KanbanPage() {
               </div>
             </SheetContent>
           </Sheet>
-          <h1 className="ml-2 text-lg font-semibold">Kanban Board</h1>
+          <h1 className="ml-2 text-base font-semibold flex-1 truncate">
+            Kanban Board
+          </h1>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleToggleView}
+            className="gap-1 text-xs"
+          >
+            <List className="size-4" />
+            List
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleOpenSearch}
+            className="size-9"
+          >
+            <Search className="size-5" />
+          </Button>
         </div>
 
-        {/* Mobile Message */}
-        <div className="flex-1 flex items-center justify-center p-4">
-          <Card className="max-w-md w-full">
-            <CardHeader>
-              <CardTitle>Kanban View</CardTitle>
-              <CardDescription>
-                The Kanban board is optimized for desktop screens. Please use a
-                desktop or tablet device for the best experience.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <Button
-                onClick={() => router.push('/mail/inbox')}
-                className="w-full"
-              >
-                Go to List View
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => router.push('/mail/inbox')}
-                className="w-full"
-              >
-                <List className="size-4 mr-2" />
-                Switch to Traditional View
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+        {isSearchMode ? (
+          <SearchResultsView
+            onBack={handleCloseSearch}
+            onViewEmail={handleViewEmailFromSearch}
+            onStar={handleStar}
+            className="h-full"
+          />
+        ) : (
+          <>
+            {/* Mobile Kanban Content */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {!isMounted || kanbanLoading || emailsLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center space-y-2">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-muted-foreground text-sm">Loading...</p>
+                  </div>
+                </div>
+              ) : kanbanBoardData ? (
+                <>
+                  {/* Filter Tabs - Show status distribution */}
+                  <div className="border-b bg-background overflow-x-auto">
+                    <div className="flex p-2 gap-2 min-w-max">
+                      {kanbanBoardData.columns.map((column) => {
+                        const columnEmails =
+                          filteredAndSortedEmailsByColumn[column.id] || [];
+                        const isActive = selectedColumnId === column.id;
+                        return (
+                          <Button
+                            key={column.id}
+                            variant={isActive ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setSelectedColumnId(column.id)}
+                            className="gap-2 whitespace-nowrap"
+                          >
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ backgroundColor: column.color }}
+                            />
+                            <span className="truncate">{column.name}</span>
+                            <span
+                              className={cn(
+                                'text-xs px-1.5 py-0.5 rounded-full shrink-0',
+                                isActive
+                                  ? 'bg-primary-foreground/20'
+                                  : 'bg-muted'
+                              )}
+                            >
+                              {columnEmails.length}
+                            </span>
+                          </Button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* All Emails List with Status Selector */}
+                  <div className="flex-1 overflow-auto">
+                    <div className="p-4 space-y-3 pb-20">
+                      {(() => {
+                        const activeColumn = kanbanBoardData.columns.find(
+                          (c) => c.id === selectedColumnId
+                        );
+                        const columnEmails =
+                          filteredAndSortedEmailsByColumn[selectedColumnId] ||
+                          [];
+
+                        if (!activeColumn) return null;
+
+                        if (columnEmails.length === 0) {
+                          return (
+                            <div className="flex flex-col items-center justify-center py-12 text-center">
+                              <div className="text-muted-foreground mb-2">
+                                No emails in {activeColumn.name}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Change filter to see other emails
+                              </p>
+                            </div>
+                          );
+                        }
+
+                        return columnEmails.map((email) => {
+                          const currentColumn = kanbanBoardData.columns.find(
+                            (col) =>
+                              filteredAndSortedEmailsByColumn[col.id]?.some(
+                                (e) => e.id === email.id
+                              )
+                          );
+
+                          return (
+                            <div
+                              key={email.id}
+                              className="space-y-2 rounded-lg hover:bg-muted/30 transition-colors p-1"
+                            >
+                              {/* Email Card */}
+                              <div
+                                onClick={() => handleCardClick(email)}
+                                className="active:scale-[0.98] transition-transform cursor-pointer"
+                              >
+                                <KanbanCard
+                                  email={email}
+                                  onOpen={handleCardClick}
+                                  onSnooze={handleSnooze}
+                                  onStar={handleStar}
+                                  onGenerateSummary={handleGenerateSummary}
+                                  isGeneratingSummary={generatingSummaryIds.has(
+                                    email.id
+                                  )}
+                                />
+                              </div>
+
+                              {/* Status Selector */}
+                              <div className="flex items-center gap-2 px-2 pb-1">
+                                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                                  Status:
+                                </span>
+                                <Select
+                                  value={currentColumn?.id || ''}
+                                  onValueChange={(newColumnId) => {
+                                    if (newColumnId !== currentColumn?.id) {
+                                      handleMoveEmail(email.id, newColumnId);
+                                      const newColumn =
+                                        kanbanBoardData.columns.find(
+                                          (c) => c.id === newColumnId
+                                        );
+                                      if (newColumn) {
+                                        toast.success(
+                                          `Moved to ${newColumn.name}`
+                                        );
+                                      }
+                                    }
+                                  }}
+                                >
+                                  <SelectTrigger className="h-9 text-xs flex-1 font-medium">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {kanbanBoardData.columns.map((column) => (
+                                      <SelectItem
+                                        key={column.id}
+                                        value={column.id}
+                                        className="cursor-pointer"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <span
+                                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                                            style={{
+                                              backgroundColor: column.color,
+                                            }}
+                                          />
+                                          <span className="font-medium">
+                                            {column.name}
+                                          </span>
+                                        </div>
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Mobile Actions Footer */}
+                  <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+                    {/* Status Bar */}
+                    {(kanbanLoading || emailsLoading || isSyncing) && (
+                      <div className="px-4 py-1 text-xs text-center text-muted-foreground border-b bg-muted/30">
+                        {isSyncing
+                          ? 'Syncing with Gmail...'
+                          : 'Loading emails...'}
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="p-3 flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSyncGmail}
+                        disabled={
+                          isSyncing || !gmailStatus?.connected || kanbanLoading
+                        }
+                        className="flex-1"
+                      >
+                        <RefreshCw
+                          className={cn(
+                            'h-4 w-4 mr-2',
+                            isSyncing && 'animate-spin'
+                          )}
+                        />
+                        Sync
+                      </Button>
+                      <KanbanSettingsDialog
+                        trigger={
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1"
+                          >
+                            <Settings className="h-4 w-4 mr-2" />
+                            Settings
+                          </Button>
+                        }
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center space-y-2 p-4">
+                    <p className="text-muted-foreground">
+                      No Kanban board found
+                    </p>
+                    <Button
+                      variant="outline"
+                      onClick={() => router.push('/mail/inbox')}
+                    >
+                      Go to Inbox
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Snooze Dialog */}
+            <SnoozeDialog
+              open={snoozeDialogOpen}
+              email={emailToSnooze}
+              onOpenChange={setSnoozeDialogOpen}
+              onConfirm={handleSnoozeConfirm}
+            />
+          </>
+        )}
       </div>
     );
   }
@@ -539,7 +782,7 @@ export default function KanbanPage() {
             onItemClick={(folder) => router.push(`/mail/${folder}`)}
           />
         )}
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <div className="border-b p-4 flex items-center justify-between shrink-0">
             <Button variant="ghost" onClick={handleBack}>
               ← Back to Kanban
@@ -549,7 +792,7 @@ export default function KanbanPage() {
               Switch to List View
             </Button>
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden min-w-0">
             <EmailDetail
               email={selectedEmail}
               onBack={handleBack}

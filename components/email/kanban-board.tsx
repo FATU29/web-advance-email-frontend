@@ -10,7 +10,7 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  closestCenter,
+  rectIntersection,
   DragCancelEvent,
 } from '@dnd-kit/core';
 
@@ -47,7 +47,7 @@ export function KanbanBoard({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 5, // 5px - balance between sensitivity and preventing accidental drags
+        distance: 2, // 2px - more responsive drag, triggers quickly when card is over column
       },
     })
   );
@@ -82,7 +82,14 @@ export function KanbanBoard({
     }
 
     const emailId = active.id as string;
-    const targetColumnId = over.id as string;
+    let targetColumnId = over.id as string;
+
+    // Check if dropping on top zone (format: "columnId-top")
+    const isTopZone = targetColumnId.endsWith('-top');
+    if (isTopZone) {
+      // Extract the actual column ID from "columnId-top"
+      targetColumnId = targetColumnId.replace('-top', '');
+    }
 
     // Find the email
     const email = allEmails.find((e) => e.id === emailId);
@@ -151,7 +158,7 @@ export function KanbanBoard({
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCenter}
+      collisionDetection={rectIntersection}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
