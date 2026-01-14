@@ -109,10 +109,10 @@ export function SearchResultCard({
       )}
       onClick={() => onView?.(result)}
     >
-      <CardContent className="p-4">
-        <div className="flex gap-3">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex gap-2 sm:gap-3">
           {/* Avatar */}
-          <Avatar className="h-10 w-10 shrink-0">
+          <Avatar className="h-9 w-9 sm:h-10 sm:w-10 shrink-0">
             <AvatarImage src={undefined} alt={senderName} />
             <AvatarFallback
               className={cn(
@@ -125,14 +125,14 @@ export function SearchResultCard({
           </Avatar>
 
           {/* Content */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             {/* Sender and Date */}
             <div className="flex items-start justify-between gap-2 mb-1">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0 overflow-hidden">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <span
                     className={cn(
-                      'text-sm truncate',
+                      'text-xs sm:text-sm truncate',
                       isUnread ? 'font-semibold' : 'font-medium'
                     )}
                   >
@@ -141,28 +141,28 @@ export function SearchResultCard({
                   {isUnread && (
                     <Badge
                       variant="default"
-                      className="h-5 px-1.5 text-xs bg-blue-500"
+                      className="h-4 sm:h-5 px-1 sm:px-1.5 text-[10px] sm:text-xs bg-blue-500 shrink-0"
                     >
                       New
                     </Badge>
                   )}
                 </div>
-                <span className="text-xs text-muted-foreground truncate block">
+                <span className="text-[10px] sm:text-xs text-muted-foreground truncate block">
                   {senderEmail}
                 </span>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                 {onStar && (
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-7 w-7 hover:bg-muted transition-colors"
+                    className="h-6 w-6 sm:h-7 sm:w-7 hover:bg-muted transition-colors"
                     onClick={handleStarClick}
                     title={isStarred ? 'Unstar email' : 'Star email'}
                   >
                     <Star
                       className={cn(
-                        'h-4 w-4 transition-all duration-200',
+                        'h-3 w-3 sm:h-4 sm:w-4 transition-all duration-200',
                         isStarred
                           ? 'fill-yellow-400 text-yellow-400 scale-110'
                           : 'hover:text-yellow-400'
@@ -171,38 +171,46 @@ export function SearchResultCard({
                   </Button>
                 )}
                 {result.hasAttachments && (
-                  <Paperclip className="h-4 w-4 text-muted-foreground" />
+                  <Paperclip className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground shrink-0" />
                 )}
-                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  {formatDate(result.receivedAt)}
-                </span>
               </div>
             </div>
 
+            {/* Date - Mobile: full width row, Desktop: inline */}
+            <div className="text-[10px] sm:text-xs text-muted-foreground mb-1 sm:hidden">
+              {formatDate(result.receivedAt)}
+            </div>
+
             {/* Subject */}
-            <div
-              className={cn(
-                'text-sm mb-1 line-clamp-1',
-                isUnread ? 'font-semibold' : 'font-medium'
-              )}
-            >
-              {result.subject || '(No subject)'}
+            <div className="flex items-start justify-between gap-2 mb-1">
+              <div
+                className={cn(
+                  'text-xs sm:text-sm line-clamp-1 flex-1 min-w-0',
+                  isUnread ? 'font-semibold' : 'font-medium'
+                )}
+              >
+                {result.subject || '(No subject)'}
+              </div>
+              {/* Date - Desktop only */}
+              <span className="hidden sm:inline-block text-xs text-muted-foreground whitespace-nowrap shrink-0">
+                {formatDate(result.receivedAt)}
+              </span>
             </div>
 
             {/* Snippet/Preview */}
             {snippet && (
-              <p className="text-sm text-muted-foreground line-clamp-2">
+              <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2 mb-2">
                 {snippet}
               </p>
             )}
 
             {/* Search Metadata */}
             {(result.score !== undefined || result.matchedFields) && (
-              <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <div className="mt-2 flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 {result.score !== undefined && (
                   <Badge
                     variant="outline"
-                    className="text-xs bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:from-purple-100 hover:to-blue-100 transition-colors"
+                    className="text-[10px] sm:text-xs bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 hover:from-purple-100 hover:to-blue-100 transition-colors"
                     title={
                       result.matchedFields?.includes('semantic')
                         ? "Conceptual Match: This email is semantically related to your search query, even if it doesn't contain the exact keywords."
@@ -229,7 +237,7 @@ export function SearchResultCard({
                   !result.matchedFields.includes('semantic') && (
                     <Badge
                       variant="secondary"
-                      className="text-xs bg-secondary/50 hover:bg-secondary/70 transition-colors"
+                      className="text-[10px] sm:text-xs bg-secondary/50 hover:bg-secondary/70 transition-colors"
                     >
                       <span className="font-semibold mr-1">Matched:</span>
                       {result.matchedFields
@@ -245,10 +253,26 @@ export function SearchResultCard({
                   )}
               </div>
             )}
+
+            {/* View Button - Mobile: full width, Desktop: right side */}
+            <div className="mt-2 sm:hidden">
+              <Button
+                variant="outline"
+                size="sm"
+                className="w-full text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onView?.(result);
+                }}
+              >
+                <Eye className="h-3 w-3 mr-1" />
+                View
+              </Button>
+            </div>
           </div>
 
-          {/* View Button */}
-          <div className="shrink-0">
+          {/* View Button - Desktop only */}
+          <div className="hidden sm:block shrink-0">
             <Button
               variant="ghost"
               size="sm"

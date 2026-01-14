@@ -763,7 +763,7 @@ export default function KanbanPage() {
 
   if (selectedEmail) {
     return (
-      <div className="flex h-screen">
+      <div className="flex h-screen overflow-hidden">
         {!isMobile && (
           <Sidebar
             mailboxes={mailboxes}
@@ -782,7 +782,7 @@ export default function KanbanPage() {
             onItemClick={(folder) => router.push(`/mail/${folder}`)}
           />
         )}
-        <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
           <div className="border-b p-4 flex items-center justify-between shrink-0">
             <Button variant="ghost" onClick={handleBack}>
               ← Back to Kanban
@@ -792,7 +792,7 @@ export default function KanbanPage() {
               Switch to List View
             </Button>
           </div>
-          <div className="flex-1 overflow-hidden min-w-0">
+          <div className="flex-1 overflow-hidden">
             <EmailDetail
               email={selectedEmail}
               onBack={handleBack}
