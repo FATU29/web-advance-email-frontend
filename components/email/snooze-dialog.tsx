@@ -24,6 +24,11 @@ export interface SnoozeDialogProps {
 }
 
 const SNOOZE_OPTIONS = [
+  {
+    label: '10 seconds (Test)',
+    value: '10s',
+    getDate: () => new Date(Date.now() + 10000),
+  },
   { label: '1 hour', value: '1h', getDate: () => addHours(new Date(), 1) },
   { label: '3 hours', value: '3h', getDate: () => addHours(new Date(), 3) },
   { label: 'Tomorrow', value: '1d', getDate: () => addDays(new Date(), 1) },
@@ -37,7 +42,7 @@ export function SnoozeDialog({
   onConfirm,
 }: SnoozeDialogProps) {
   //Init state hook
-  const [selectedOption, setSelectedOption] = React.useState<string>('1h');
+  const [selectedOption, setSelectedOption] = React.useState<string>('10s');
 
   //Init event handle
   const handleConfirm = () => {
