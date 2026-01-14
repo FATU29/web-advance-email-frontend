@@ -37,7 +37,7 @@ export function SearchResultsView({
   const [searchQuery, setSearchQuery] = React.useState('');
   const [activeQuery, setActiveQuery] = React.useState('');
   const [includeBody] = React.useState(true);
-  const [searchMode, setSearchMode] = React.useState<SearchMode>('semantic');
+  const [searchMode, setSearchMode] = React.useState<SearchMode>('fuzzy');
   const isMobile = useIsMobile();
 
   // Check semantic search availability
@@ -113,6 +113,15 @@ export function SearchResultsView({
 
     // Perform semantic search if mode is 'semantic'
     if (searchMode === 'semantic') {
+      // Check if semantic search is available
+      if (!semanticStatus?.available) {
+        toast.error(
+          'Semantic search is not available. Please configure OpenAI API key or switch to Fuzzy mode.',
+          { duration: 5000 }
+        );
+        return;
+      }
+
       // Perform semantic search with auto-generate
       // Will automatically generate embeddings for emails that don't have them yet
       // NOTE: Set to false to test semantic search without generating embeddings
@@ -179,6 +188,14 @@ export function SearchResultsView({
   };
 
   const handleSearchModeChange = (mode: SearchMode) => {
+    // Warn if switching to semantic mode when it's not available
+    if (mode === 'semantic' && !semanticStatus?.available) {
+      toast.warning(
+        'Semantic search is not available. Please configure OpenAI API key.',
+        { duration: 5000 }
+      );
+      // Still allow the switch to show the option
+    }
     setSearchMode(mode);
     // If switching mode and we have an active query, trigger search
     if (activeQuery.trim()) {
@@ -248,9 +265,7 @@ export function SearchResultsView({
             }
             autoFocus={!isMobile}
             searchMode={searchMode}
-            onSearchModeChange={
-              semanticStatus?.available ? handleSearchModeChange : undefined
-            }
+            onSearchModeChange={handleSearchModeChange}
           />
           {searchMode === 'semantic' && semanticStatus?.available && (
             <div className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20 rounded-lg border border-purple-200 dark:border-purple-800">
