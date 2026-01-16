@@ -369,6 +369,8 @@ export const useToggleEmailStarMutation = () => {
       });
       queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
       queryClient.invalidateQueries({ queryKey: emailQueryKeys.mailboxes() });
+      // Invalidate kanban queries to update UI in kanban board
+      queryClient.invalidateQueries({ queryKey: ['kanban'] });
     },
   });
 };

@@ -3,7 +3,15 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { List, RefreshCw, Search, Settings } from 'lucide-react';
+import {
+  List,
+  RefreshCw,
+  Search,
+  Settings,
+  Inbox,
+  Send,
+  Star,
+} from 'lucide-react';
 
 import { Sidebar } from '@/components/email/sidebar';
 import { EmailDetail } from '@/components/email/email-detail';
@@ -14,7 +22,6 @@ import { SnoozeDialog } from '@/components/email/snooze-dialog';
 import { SearchResultsView } from '@/components/email/search-results-view';
 import { KanbanSettingsDialog } from '@/components/email/kanban-settings-dialog';
 import { Button } from '@/components/ui/button';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -765,22 +772,37 @@ export default function KanbanPage() {
     return (
       <div className="flex h-screen overflow-hidden">
         {!isMobile && (
-          <Sidebar
-            mailboxes={mailboxes}
-            activeFolder={inboxMailbox.id}
-            user={
-              user
-                ? {
-                    id: user.id,
-                    name: user.name,
-                    email: user.email,
-                    avatar: user.profilePicture || undefined,
-                  }
-                : undefined
-            }
-            onLogoutClick={logout}
-            onItemClick={(folder) => router.push(`/mail/${folder}`)}
-          />
+          <div className="w-16 border-r shrink-0">
+            <div className="flex flex-col h-full py-4 items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push('/mail/inbox')}
+                title="Inbox"
+                className="size-10"
+              >
+                <Inbox className="size-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push('/mail/sent')}
+                title="Sent"
+                className="size-10"
+              >
+                <Send className="size-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => router.push('/mail/starred')}
+                title="Starred"
+                className="size-10"
+              >
+                <Star className="size-5" />
+              </Button>
+            </div>
+          </div>
         )}
         <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
           <div className="border-b p-4 flex items-center justify-between shrink-0">

@@ -205,16 +205,21 @@ export function KanbanCard({
             <Button
               variant="ghost"
               size="icon"
-              className="size-6 opacity-0 group-hover:opacity-100 transition-all hover:bg-muted"
+              className={cn(
+                'size-6 transition-all hover:bg-muted',
+                email.isStarred
+                  ? 'opacity-100'
+                  : 'opacity-0 group-hover:opacity-100'
+              )}
               onClick={handleStar}
               title={email.isStarred ? 'Unstar email' : 'Star email'}
             >
               <Star
                 className={cn(
-                  'size-3.5 transition-all duration-200',
+                  'transition-all duration-200',
                   email.isStarred
-                    ? 'fill-yellow-500 text-yellow-500 scale-110'
-                    : 'hover:text-yellow-500'
+                    ? 'size-4 fill-yellow-500 text-yellow-500 drop-shadow-md'
+                    : 'size-3.5 hover:text-yellow-500'
                 )}
               />
             </Button>

@@ -255,9 +255,13 @@ export default function MailFolderPage({
       {
         onSuccess: () => {
           toast.success('Email archived successfully');
+          // Update local email list immediately
+          setEmailsList((prevList) => prevList.filter((e) => e.id !== emailId));
+          // Clear selected email if it was the archived one
           if (selectedEmailId === emailId) {
             setSelectedEmailId(null);
           }
+          // Clear from selection
           const newSelected = new Set(selectedEmails);
           newSelected.delete(emailId);
           setSelectedEmails(newSelected);
@@ -293,6 +297,12 @@ export default function MailFolderPage({
           toast.success(
             `${emailIds.length} email(s) ${actionLabels[action]} successfully`
           );
+          // Update local email list immediately for delete/archive actions
+          if (action === 'delete' || action === 'archive') {
+            setEmailsList((prevList) =>
+              prevList.filter((e) => !emailIds.includes(e.id))
+            );
+          }
           // Clear selection after action
           setSelectedEmails(new Set());
           // Clear selected email if it was in the list
@@ -315,9 +325,13 @@ export default function MailFolderPage({
     deleteEmailMutation.mutate(emailId, {
       onSuccess: () => {
         toast.success('Email deleted successfully');
+        // Update local email list immediately
+        setEmailsList((prevList) => prevList.filter((e) => e.id !== emailId));
+        // Clear selected email if it was the deleted one
         if (selectedEmailId === emailId) {
           setSelectedEmailId(null);
         }
+        // Clear from selection
         const newSelected = new Set(selectedEmails);
         newSelected.delete(emailId);
         setSelectedEmails(newSelected);
