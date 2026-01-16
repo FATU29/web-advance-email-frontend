@@ -502,8 +502,8 @@ export const useAuthBroadcastSync = () => {
         if (typeof window !== 'undefined') {
           // Redirect to login page to ensure clean state
           // Use replace to avoid adding to history
-          if (window.location.pathname !== '/auth/login') {
-            window.location.replace('/auth/login');
+          if (window.location.pathname !== '/login') {
+            window.location.replace('/login');
           }
         }
       }
