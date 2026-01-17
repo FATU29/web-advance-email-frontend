@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
+import { addHours } from 'date-fns';
 import {
   List,
   RefreshCw,
@@ -311,23 +312,51 @@ export default function KanbanPage() {
 
   //Init event handle
   const handleMoveEmail = (emailId: string, targetColumnId: string) => {
-    moveEmailMutation.mutate(
-      {
-        emailId,
-        targetColumnId,
-      },
-      {
-        onSuccess: () => {
-          toast.success('Email moved successfully');
-          // Query will be invalidated automatically by mutation
-        },
-        onError: (error) => {
-          toast.error(
-            error instanceof Error ? error.message : 'Failed to move email'
-          );
-        },
-      }
+    // Check if target column is SNOOZED type
+    const targetColumn = kanbanBoardData?.columns.find(
+      (col) => col.id === targetColumnId
     );
+
+    if (targetColumn?.type === 'SNOOZED') {
+      // Automatically snooze with 1 hour when dragging to SNOOZED column
+      const snoozeUntil = addHours(new Date(), 1).toISOString();
+      snoozeEmailKanbanMutation.mutate(
+        {
+          emailId,
+          snoozeUntil,
+        },
+        {
+          onSuccess: () => {
+            toast.success('Email snoozed for 1 hour');
+            // Query will be invalidated automatically by mutation
+          },
+          onError: (error) => {
+            toast.error(
+              error instanceof Error ? error.message : 'Failed to snooze email'
+            );
+          },
+        }
+      );
+    } else {
+      // Normal move for non-SNOOZED columns
+      moveEmailMutation.mutate(
+        {
+          emailId,
+          targetColumnId,
+        },
+        {
+          onSuccess: () => {
+            toast.success('Email moved successfully');
+            // Query will be invalidated automatically by mutation
+          },
+          onError: (error) => {
+            toast.error(
+              error instanceof Error ? error.message : 'Failed to move email'
+            );
+          },
+        }
+      );
+    }
   };
 
   const handleSyncGmail = async () => {
@@ -442,16 +471,9 @@ export default function KanbanPage() {
     setIsSearchMode(false);
   };
 
-  // Filter out snoozed emails that haven't expired
-  const visibleEmails = React.useMemo(() => {
-    const now = new Date();
-    return emails.filter((email) => {
-      if (email.kanbanStatus === 'SNOOZED' && email.snoozeUntil) {
-        return new Date(email.snoozeUntil) <= now;
-      }
-      return true;
-    });
-  }, [emails]);
+  // Note: We don't filter out snoozed emails here because they should be visible in the SNOOZED column
+  // Backend scheduler automatically moves expired snoozed emails back to their original column
+  const visibleEmails = emails;
 
   //Render mobile kanban view
   if (isMobile) {

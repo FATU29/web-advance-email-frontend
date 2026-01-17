@@ -17,6 +17,7 @@ import {
   Trash2,
   Star,
   ExternalLink,
+  Download,
 } from 'lucide-react';
 
 import {
@@ -33,6 +34,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { IEmailDetail } from '@/types/api.types';
 import { cn } from '@/lib/utils';
+import EmailService from '@/services/email.service';
 
 export interface EmailDetailProps {
   email: IEmailDetail;
@@ -69,6 +71,40 @@ export function EmailDetail({
       return email[0].toUpperCase();
     }
     return '?';
+  };
+
+  // Download attachment handler
+  const handleDownloadAttachment = async (
+    messageId: string,
+    attachmentId: string,
+    filename: string,
+    mimeType: string
+  ) => {
+    try {
+      const blob = await EmailService.downloadAttachment(
+        messageId,
+        attachmentId,
+        filename,
+        mimeType
+      );
+
+      // Create a temporary URL for the blob
+      const url = window.URL.createObjectURL(blob);
+
+      // Create a temporary anchor element to trigger download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to download attachment:', error);
+      // You can add a toast notification here if you have a toast system
+    }
   };
 
   // Generate consistent random color based on email/name
@@ -643,7 +679,10 @@ export function EmailDetail({
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {email.attachments?.map((attachment) => (
-                    <Card key={attachment.id} className="p-2">
+                    <Card
+                      key={attachment.id}
+                      className="p-2 hover:bg-muted/50 transition-colors"
+                    >
                       <div className="flex items-center gap-2">
                         <Paperclip className="size-4 text-muted-foreground" />
                         <div className="flex flex-col">
@@ -654,6 +693,22 @@ export function EmailDetail({
                             {(attachment.size / 1024).toFixed(2)} KB
                           </span>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-8 ml-2"
+                          onClick={() =>
+                            handleDownloadAttachment(
+                              email.id,
+                              attachment.id,
+                              attachment.filename,
+                              attachment.mimeType
+                            )
+                          }
+                          title="Download attachment"
+                        >
+                          <Download className="size-4" />
+                        </Button>
                       </div>
                     </Card>
                   ))}

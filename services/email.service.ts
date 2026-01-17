@@ -13,7 +13,11 @@ import {
   IEmailSummaryResponse,
   KanbanStatus,
 } from '@/types/api.types';
-import { EMAIL_ENDPOINTS, MAILBOX_ENDPOINTS } from '@/utils/constants/api';
+import {
+  EMAIL_ENDPOINTS,
+  MAILBOX_ENDPOINTS,
+  ATTACHMENT_ENDPOINTS,
+} from '@/utils/constants/api';
 
 //==================== REGION EMAIL SERVICE ====================
 
@@ -167,6 +171,32 @@ class EmailService {
     emailId: string
   ): Promise<CustomAxiosResponse<ApiResponse<IEmailSummaryResponse>>> {
     return await axiosBI.get(EMAIL_ENDPOINTS.SUMMARY(emailId));
+  }
+
+  /**
+   * Download attachment
+   * @param messageId - Gmail message ID
+   * @param attachmentId - Gmail attachment ID
+   * @param filename - Filename for the download
+   * @param mimeType - MIME type of the attachment
+   */
+  static async downloadAttachment(
+    messageId: string,
+    attachmentId: string,
+    filename: string,
+    mimeType: string
+  ): Promise<Blob> {
+    const params = new URLSearchParams();
+    if (filename) params.append('filename', filename);
+    if (mimeType) params.append('mimeType', mimeType);
+
+    const url = `${ATTACHMENT_ENDPOINTS.DOWNLOAD(messageId, attachmentId)}?${params.toString()}`;
+
+    const response = await axiosBI.get(url, {
+      responseType: 'blob',
+    });
+
+    return response.data;
   }
 }
 

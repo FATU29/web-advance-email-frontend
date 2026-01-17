@@ -238,7 +238,7 @@ export const useMoveEmailMutation = () => {
             sourceColumnId
           ].filter((e) => e.emailId !== request.emailId);
 
-          // Add to target column (update columnId in email)
+          // Add to target column at the beginning (top)
           const updatedEmail = {
             ...emailToMove,
             columnId: request.targetColumnId,
@@ -248,8 +248,8 @@ export const useMoveEmailMutation = () => {
             newEmailsByColumn[request.targetColumnId] = [];
           }
           newEmailsByColumn[request.targetColumnId] = [
-            ...newEmailsByColumn[request.targetColumnId],
             updatedEmail,
+            ...newEmailsByColumn[request.targetColumnId],
           ];
 
           // Update column counts
@@ -303,10 +303,120 @@ export const useSnoozeEmailKanbanMutation = () => {
   return useMutation({
     mutationFn: (request: ISnoozeEmailRequest) =>
       KanbanService.snoozeEmail(request),
-    onSuccess: () => {
+    // Optimistic update: Move email to SNOOZED column immediately
+    onMutate: async (request: ISnoozeEmailRequest) => {
+      // Cancel all outgoing refetches for board queries
+      await queryClient.cancelQueries({
+        queryKey: kanbanQueryKeys.board(),
+        exact: false,
+      });
+
+      // Get all cached board queries
+      const queryCache = queryClient.getQueryCache();
+      const allBoardQueries = queryCache
+        .findAll({ queryKey: kanbanQueryKeys.board(), exact: false })
+        .map((q) => ({
+          key: q.queryKey,
+          data: q.state.data as IKanbanBoard | undefined,
+        }))
+        .filter((q) => q.data);
+
+      // Optimistically update all cached board queries
+      allBoardQueries.forEach(({ key, data }) => {
+        if (!data) return;
+
+        queryClient.setQueryData<IKanbanBoard>(key, (old) => {
+          if (!old) return old;
+
+          // Find the email and the SNOOZED column
+          let emailToMove: IKanbanEmail | null = null;
+          let sourceColumnId: string | null = null;
+          const snoozedColumn = old.columns.find(
+            (col) => col.type === 'SNOOZED'
+          );
+
+          if (!snoozedColumn) return old; // No SNOOZED column
+
+          // Find which column contains the email
+          for (const [columnId, emails] of Object.entries(old.emailsByColumn)) {
+            const email = emails.find((e) => e.emailId === request.emailId);
+            if (email) {
+              emailToMove = { ...email };
+              sourceColumnId = columnId;
+              break;
+            }
+          }
+
+          if (
+            !emailToMove ||
+            !sourceColumnId ||
+            sourceColumnId === snoozedColumn.id
+          ) {
+            return old; // Email not found or already in SNOOZED column
+          }
+
+          // Create new emailsByColumn with the email moved to SNOOZED
+          const newEmailsByColumn = { ...old.emailsByColumn };
+
+          // Remove from source column
+          newEmailsByColumn[sourceColumnId] = newEmailsByColumn[
+            sourceColumnId
+          ].filter((e) => e.emailId !== request.emailId);
+
+          // Add to SNOOZED column (at the beginning)
+          const updatedEmail = {
+            ...emailToMove,
+            columnId: snoozedColumn.id,
+            kanbanStatus: 'SNOOZED' as const,
+            snoozed: true,
+            snoozeUntil: request.snoozeUntil,
+          };
+
+          if (!newEmailsByColumn[snoozedColumn.id]) {
+            newEmailsByColumn[snoozedColumn.id] = [];
+          }
+          newEmailsByColumn[snoozedColumn.id] = [
+            updatedEmail,
+            ...newEmailsByColumn[snoozedColumn.id],
+          ];
+
+          // Update column counts
+          const newColumns = old.columns.map((col) => {
+            if (col.id === sourceColumnId) {
+              return { ...col, emailCount: Math.max(0, col.emailCount - 1) };
+            }
+            if (col.id === snoozedColumn.id) {
+              return { ...col, emailCount: col.emailCount + 1 };
+            }
+            return col;
+          });
+
+          return {
+            ...old,
+            columns: newColumns,
+            emailsByColumn: newEmailsByColumn,
+          };
+        });
+      });
+
+      // Return context with snapshots for rollback
+      return { previousQueries: allBoardQueries };
+    },
+    // Rollback on error
+    onError: (_error, _request, context) => {
+      if (context?.previousQueries) {
+        context.previousQueries.forEach(({ key, data }) => {
+          if (data) {
+            queryClient.setQueryData(key, data);
+          }
+        });
+      }
+    },
+    // Always refetch after error or success to ensure sync
+    onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: kanbanQueryKeys.board(),
-        exact: false, // Invalidate all board queries including filtered ones
+        exact: false,
       });
     },
   });
@@ -337,11 +447,62 @@ export const useGenerateSummaryMutation = () => {
 
   return useMutation({
     mutationFn: (emailId: string) => KanbanService.generateSummary(emailId),
-    onSuccess: (data, emailId) => {
-      // Invalidate all board queries (including filtered ones) to show new summary
+    onSuccess: (response, emailId) => {
+      // Extract the updated email from response
+      const updatedEmail = response.data.data;
+
+      if (updatedEmail) {
+        // Update all board queries with the new summary
+        const queryCache = queryClient.getQueryCache();
+        const allBoardQueries = queryCache
+          .findAll({ queryKey: kanbanQueryKeys.board(), exact: false })
+          .map((q) => ({
+            key: q.queryKey,
+            data: q.state.data as IKanbanBoard | undefined,
+          }))
+          .filter((q) => q.data);
+
+        // Update each cached board query
+        allBoardQueries.forEach(({ key, data }) => {
+          if (!data) return;
+
+          queryClient.setQueryData<IKanbanBoard>(key, (old) => {
+            if (!old) return old;
+
+            // Update the email in emailsByColumn
+            const newEmailsByColumn = { ...old.emailsByColumn };
+            for (const [columnId, emails] of Object.entries(
+              newEmailsByColumn
+            )) {
+              const emailIndex = emails.findIndex((e) => e.emailId === emailId);
+              if (emailIndex !== -1) {
+                // Update the email with new summary data
+                newEmailsByColumn[columnId] = [
+                  ...emails.slice(0, emailIndex),
+                  {
+                    ...emails[emailIndex],
+                    summary: updatedEmail.summary,
+                    aiSummary: updatedEmail.summary, // Keep both fields in sync
+                    summaryGeneratedAt: updatedEmail.summaryGeneratedAt,
+                  },
+                  ...emails.slice(emailIndex + 1),
+                ];
+                break;
+              }
+            }
+
+            return {
+              ...old,
+              emailsByColumn: newEmailsByColumn,
+            };
+          });
+        });
+      }
+
+      // Still invalidate to ensure full sync
       queryClient.invalidateQueries({
         queryKey: kanbanQueryKeys.board(),
-        exact: false, // Invalidate all board queries including filtered ones
+        exact: false,
       });
       queryClient.invalidateQueries({
         queryKey: kanbanQueryKeys.emailStatus(emailId),

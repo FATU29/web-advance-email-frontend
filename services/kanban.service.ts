@@ -42,6 +42,7 @@ export interface IKanbanEmail {
   isStarred: boolean;
   hasAttachments?: boolean;
   summary?: string | null;
+  aiSummary?: string | null; // Alias for summary, for compatibility with IEmailListItem
   summaryGeneratedAt?: string | null;
   snoozed: boolean;
   snoozeUntil?: string | null;

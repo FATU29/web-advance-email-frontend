@@ -269,11 +269,11 @@ export function KanbanCard({
 
         {/* AI Summary */}
         {email.aiSummary && (
-          <div className="bg-linear-to-br from-muted/60 to-muted/40 rounded-md p-1.5 border border-border/50 max-w-full overflow-hidden">
-            <div className="flex items-center justify-between gap-1 mb-0.5">
-              <div className="flex items-center gap-1 min-w-0 flex-1">
-                <div className="size-1 rounded-full bg-primary shrink-0"></div>
-                <span className="text-[10px] font-semibold text-foreground truncate">
+          <div className="bg-gradient-to-br from-blue-50/80 to-purple-50/80 dark:from-blue-950/30 dark:to-purple-950/30 rounded-md p-2 border border-blue-200/50 dark:border-blue-800/50 max-w-full overflow-hidden shadow-sm">
+            <div className="flex items-center justify-between gap-1 mb-1">
+              <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <Sparkles className="size-3 text-blue-600 dark:text-blue-400 shrink-0" />
+                <span className="text-[11px] font-bold text-blue-700 dark:text-blue-300 truncate">
                   AI Summary
                 </span>
               </div>
@@ -410,9 +410,9 @@ export function KanbanCard({
                 )}
               </div>
             </div>
-            <p className="text-[10px] text-muted-foreground leading-snug line-clamp-3 overflow-hidden wrap-break-word max-w-full">
-              {email.aiSummary.length > 150
-                ? `${email.aiSummary.substring(0, 150)}...`
+            <p className="text-xs text-foreground/90 leading-relaxed line-clamp-3 overflow-hidden break-words max-w-full">
+              {email.aiSummary.length > 180
+                ? `${email.aiSummary.substring(0, 180)}...`
                 : email.aiSummary}
             </p>
           </div>

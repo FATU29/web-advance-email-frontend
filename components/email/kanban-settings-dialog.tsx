@@ -32,7 +32,7 @@ import {
 } from '@/hooks/use-kanban-mutations';
 import { useGmailStatusQuery } from '@/hooks/use-kanban-mutations';
 import KanbanService from '@/services/kanban.service';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 
@@ -66,8 +66,12 @@ export function KanbanSettingsDialog({
       }
     : setInternalOpen;
 
+  // Query client for manual refetch
+  const queryClient = useQueryClient();
+
   // Fetch columns
-  const { data: columns = [] } = useKanbanColumnsQuery();
+  const { data: columns = [], refetch: refetchColumns } =
+    useKanbanColumnsQuery();
 
   // Fetch Gmail status
   const { data: gmailStatus } = useGmailStatusQuery();
@@ -109,7 +113,8 @@ export function KanbanSettingsDialog({
       });
       toast.success('Column created successfully');
       setNewColumnName('');
-      // No need to refetch - optimistic update handles this
+      // Force refetch to ensure UI updates immediately
+      await refetchColumns();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to create column'
@@ -138,7 +143,8 @@ export function KanbanSettingsDialog({
       toast.success('Column updated successfully');
       setEditingColumnId(null);
       setEditingColumnName('');
-      // No need to refetch - optimistic update handles this
+      // Force refetch to ensure UI updates immediately
+      await refetchColumns();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to update column'
@@ -168,7 +174,8 @@ export function KanbanSettingsDialog({
     try {
       await deleteColumnMutation.mutateAsync(column.id);
       toast.success('Column deleted successfully');
-      // No need to refetch - optimistic update handles this
+      // Force refetch to ensure UI updates immediately
+      await refetchColumns();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to delete column'
@@ -192,7 +199,8 @@ export function KanbanSettingsDialog({
       });
       toast.success('Label mapping saved successfully');
       setSelectedColumnForLabelMapping(null);
-      // No need to refetch - optimistic update handles this
+      // Force refetch to ensure UI updates immediately
+      await refetchColumns();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to save label mapping'
@@ -210,7 +218,8 @@ export function KanbanSettingsDialog({
       });
       toast.success('Label mapping cleared');
       setSelectedColumnForLabelMapping(null);
-      // No need to refetch - optimistic update handles this
+      // Force refetch to ensure UI updates immediately
+      await refetchColumns();
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to clear label mapping'
