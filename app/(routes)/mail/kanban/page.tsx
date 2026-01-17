@@ -150,13 +150,16 @@ export default function KanbanPage() {
   );
 
   // Fetch filtered Kanban board data from backend
-  const { data: kanbanBoardData, isLoading: kanbanLoading } =
-    useKanbanFilteredBoardQuery(filterParams, {
-      enabled: true, // Always enabled - using real API
-      refetchOnWindowFocus: false,
-      refetchOnMount: true,
-      refetchInterval: false, // Disable auto-refetch to prevent spam
-    });
+  const {
+    data: kanbanBoardData,
+    isLoading: kanbanLoading,
+    refetch: refetchKanbanBoard,
+  } = useKanbanFilteredBoardQuery(filterParams, {
+    enabled: true, // Always enabled - using real API
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchInterval: false, // Disable auto-refetch to prevent spam
+  });
 
   // Sync mutation
   const syncGmailMutation = useSyncGmailMutation();
@@ -258,7 +261,7 @@ export default function KanbanPage() {
       return;
     }
 
-    const checkSnoozes = () => {
+    const checkSnoozes = async () => {
       const now = new Date();
       const expiredSnoozes = emails.filter(
         (email) =>
@@ -274,41 +277,72 @@ export default function KanbanPage() {
 
       // Process expired snoozes one by one to avoid spam
       // Use unsnooze mutation to restore to previous column
-      expiredSnoozes.forEach((email) => {
-        unsnoozeEmailMutation.mutate(email.id, {
-          onSuccess: () => {
-            toast.success(`Email "${email.subject}" restored`);
-            // Query will be invalidated automatically by mutation
-          },
-          onError: (_error) => {
-            // If unsnooze fails, try moving to inbox as fallback
-            const targetColumn = kanbanBoardData?.columns.find(
-              (c) => c.type === 'INBOX'
-            );
-            if (targetColumn) {
-              moveEmailMutation.mutate(
-                {
-                  emailId: email.id,
-                  targetColumnId: targetColumn.id,
-                },
-                {
-                  onSuccess: () => {
-                    toast.success(`Email "${email.subject}" restored to inbox`);
-                  },
-                }
-              );
+      for (const email of expiredSnoozes) {
+        try {
+          await unsnoozeEmailMutation.mutateAsync(email.id);
+          toast.success(
+            `Email "${email.subject}" restored to its original column`
+          );
+        } catch (_error) {
+          // If unsnooze fails, try moving to inbox as fallback
+          const targetColumn = kanbanBoardData?.columns.find(
+            (c) => c.type === 'INBOX'
+          );
+          if (targetColumn) {
+            try {
+              await moveEmailMutation.mutateAsync({
+                emailId: email.id,
+                targetColumnId: targetColumn.id,
+              });
+              toast.success(`Email "${email.subject}" restored to inbox`);
+            } catch (moveError) {
+              console.error('Failed to restore email:', moveError);
             }
-          },
-        });
-      });
+          }
+        }
+      }
+
+      // Note: No need to manually refetch as mutation handles it
+      // But we can trigger it as a safety measure
+      // The mutation's onSuccess already does refetchQueries
     };
 
-    // Check every minute (not immediately to avoid spam on mount)
-    const interval = setInterval(checkSnoozes, 60000);
+    // Find all snoozed emails and their expiry times
+    const snoozedEmails = emails.filter(
+      (email) => email.kanbanStatus === 'SNOOZED' && email.snoozeUntil
+    );
 
-    return () => clearInterval(interval);
+    // If there are snoozed emails, set up intelligent polling
+    if (snoozedEmails.length > 0) {
+      // Find the earliest expiry time
+      const now = new Date().getTime();
+      const nextExpiryTime = Math.min(
+        ...snoozedEmails.map((email) => new Date(email.snoozeUntil!).getTime())
+      );
+
+      // Calculate time until next expiry (in milliseconds)
+      const timeUntilExpiry = nextExpiryTime - now;
+
+      // If an email is already expired or will expire soon, check frequently
+      if (timeUntilExpiry <= 60000) {
+        // Check every 10 seconds if expiry is within 1 minute
+        const interval = setInterval(checkSnoozes, 10000);
+        return () => clearInterval(interval);
+      } else if (timeUntilExpiry <= 300000) {
+        // Check every 30 seconds if expiry is within 5 minutes
+        const interval = setInterval(checkSnoozes, 30000);
+        return () => clearInterval(interval);
+      } else {
+        // Check every minute for longer snoozes
+        const interval = setInterval(checkSnoozes, 60000);
+        return () => clearInterval(interval);
+      }
+    }
+
+    // No snoozed emails, no need to check
+    return () => {};
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emails.length]); // Only depend on emails.length to prevent infinite loops
+  }, [emails.length, kanbanBoardData]); // Re-run when email count or board changes
 
   //Init event handle
   const handleMoveEmail = (emailId: string, targetColumnId: string) => {
