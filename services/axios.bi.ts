@@ -28,8 +28,8 @@ interface RefreshTokenResponse {
 }
 
 interface PendingRequest {
-  resolve: (value?: string | null) => void;
-  reject: (error?: AxiosError) => void;
+  resolve: (value: string) => void;
+  reject: (error: AxiosError) => void;
 }
 //====================================================
 
@@ -37,20 +37,33 @@ interface PendingRequest {
 const REFRESH_TOKEN_ENDPOINT = AUTH_ENDPOINTS.REFRESH;
 //====================================================
 
+// Concurrency handling for token refresh
 // Flag to prevent multiple refresh token requests
 let isRefreshing = false;
+// Queue to hold pending requests while token is being refreshed
 let failedQueue: PendingRequest[] = [];
+// Promise to track the ongoing refresh operation
+let refreshTokenPromise: Promise<string | null> | null = null;
 
 // Process queued requests after token refresh
 const processQueue = (
   error: AxiosError | null,
   token: string | null = null
 ) => {
+  console.warn(
+    `📋 Processing ${failedQueue.length} queued requests...`,
+    error ? 'with error' : 'with new token'
+  );
+
   failedQueue.forEach((prom) => {
     if (error) {
       prom.reject(error);
-    } else {
+    } else if (token) {
       prom.resolve(token);
+    } else {
+      prom.reject(
+        new Error('Token refresh failed: No token received') as AxiosError
+      );
     }
   });
 
@@ -174,16 +187,22 @@ const createAxiosInstance = (baseURL?: string): AxiosInstance => {
           return Promise.reject(error);
         }
 
-        if (isRefreshing) {
+        // Mark this request as retried to prevent infinite loop
+        originalRequest._retry = true;
+
+        // If a refresh is already in progress, queue this request
+        if (isRefreshing && refreshTokenPromise) {
           console.warn(
             '⏳ Token refresh already in progress. Queuing request...'
           );
-          // If already refreshing, queue this request
-          return new Promise((resolve, reject) => {
+
+          // Return a promise that will be resolved/rejected when refresh completes
+          return new Promise<string>((resolve, reject) => {
             failedQueue.push({ resolve, reject });
           })
             .then((token) => {
-              if (originalRequest.headers && token) {
+              // Retry the original request with the new token
+              if (originalRequest.headers) {
                 originalRequest.headers.Authorization = `Bearer ${token}`;
               }
               return instance(originalRequest);
@@ -193,38 +212,55 @@ const createAxiosInstance = (baseURL?: string): AxiosInstance => {
             });
         }
 
+        // No refresh in progress - start a new one
         console.warn('🔄 Starting token refresh process...');
-        originalRequest._retry = true;
         isRefreshing = true;
 
-        try {
-          const newAccessToken = await refreshAccessToken();
-
-          if (newAccessToken) {
-            console.warn(
-              '✅ Token refreshed successfully. Retrying original request...'
-            );
-            processQueue(null, newAccessToken);
-
-            // Retry original request with new token
-            if (originalRequest.headers) {
-              originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
+        // Create a single promise for the refresh operation
+        // All queued requests will wait for this same promise
+        refreshTokenPromise = refreshAccessToken()
+          .then((newAccessToken) => {
+            if (newAccessToken) {
+              console.warn(
+                '✅ Token refreshed successfully. Processing queued requests...'
+              );
+              // Notify all queued requests with the new token
+              processQueue(null, newAccessToken);
+              return newAccessToken;
+            } else {
+              console.warn(
+                '❌ Failed to refresh token. Rejecting queued requests.'
+              );
+              const refreshError = new Error(
+                'Token refresh failed'
+              ) as AxiosError;
+              processQueue(refreshError, null);
+              throw refreshError;
             }
+          })
+          .catch((refreshError) => {
+            console.warn('❌ Token refresh threw error:', refreshError);
+            processQueue(refreshError as AxiosError, null);
+            throw refreshError;
+          })
+          .finally(() => {
+            // Reset state after refresh completes (success or failure)
+            isRefreshing = false;
+            refreshTokenPromise = null;
+          });
 
-            return instance(originalRequest);
-          } else {
-            console.warn(
-              '❌ Failed to refresh token. Rejecting queued requests.'
-            );
-            processQueue(error, null);
-            return Promise.reject(error);
+        try {
+          const newAccessToken = await refreshTokenPromise;
+
+          // Retry the original request with the new token
+          if (originalRequest.headers) {
+            originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           }
+
+          return instance(originalRequest);
         } catch (refreshError) {
-          console.warn('❌ Token refresh threw error:', refreshError);
-          processQueue(refreshError as AxiosError, null);
+          // Refresh failed - reject this request
           return Promise.reject(refreshError);
-        } finally {
-          isRefreshing = false;
         }
       }
 
