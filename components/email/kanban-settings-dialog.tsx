@@ -32,7 +32,7 @@ import {
 } from '@/hooks/use-kanban-mutations';
 import { useGmailStatusQuery } from '@/hooks/use-kanban-mutations';
 import KanbanService from '@/services/kanban.service';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { AxiosError } from 'axios';
 
@@ -66,11 +66,8 @@ export function KanbanSettingsDialog({
       }
     : setInternalOpen;
 
-  // Query client for manual refetch
-  const queryClient = useQueryClient();
-
   // Fetch columns
-  const { data: columns = [], refetch: refetchColumns } =
+  const { data: columns = [], isFetching: isRefetchingColumns } =
     useKanbanColumnsQuery();
 
   // Fetch Gmail status
@@ -113,8 +110,7 @@ export function KanbanSettingsDialog({
       });
       toast.success('Column created successfully');
       setNewColumnName('');
-      // Force refetch to ensure UI updates immediately
-      await refetchColumns();
+      // No manual refetch needed - mutation handles it automatically
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to create column'
@@ -143,8 +139,7 @@ export function KanbanSettingsDialog({
       toast.success('Column updated successfully');
       setEditingColumnId(null);
       setEditingColumnName('');
-      // Force refetch to ensure UI updates immediately
-      await refetchColumns();
+      // No manual refetch needed - mutation handles it automatically
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to update column'
@@ -174,8 +169,7 @@ export function KanbanSettingsDialog({
     try {
       await deleteColumnMutation.mutateAsync(column.id);
       toast.success('Column deleted successfully');
-      // Force refetch to ensure UI updates immediately
-      await refetchColumns();
+      // No manual refetch needed - mutation handles it automatically
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to delete column'
@@ -199,8 +193,7 @@ export function KanbanSettingsDialog({
       });
       toast.success('Label mapping saved successfully');
       setSelectedColumnForLabelMapping(null);
-      // Force refetch to ensure UI updates immediately
-      await refetchColumns();
+      // Mutation handles invalidation automatically
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to save label mapping'
@@ -218,8 +211,7 @@ export function KanbanSettingsDialog({
       });
       toast.success('Label mapping cleared');
       setSelectedColumnForLabelMapping(null);
-      // Force refetch to ensure UI updates immediately
-      await refetchColumns();
+      // Mutation handles invalidation automatically
     } catch (error) {
       toast.error(
         error instanceof Error ? error.message : 'Failed to clear label mapping'
@@ -270,23 +262,31 @@ export function KanbanSettingsDialog({
                     value={newColumnName}
                     onChange={(e) => setNewColumnName(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
+                      if (
+                        e.key === 'Enter' &&
+                        !createColumnMutation.isPending
+                      ) {
                         handleCreateColumn();
                       }
                     }}
+                    disabled={createColumnMutation.isPending}
                     className="flex-1"
                   />
                   <Button
                     onClick={handleCreateColumn}
                     disabled={
-                      !newColumnName.trim() || createColumnMutation.isPending
+                      !newColumnName.trim() ||
+                      createColumnMutation.isPending ||
+                      isRefetchingColumns
                     }
                     className="gap-2 px-6"
                   >
-                    {createColumnMutation.isPending ? (
+                    {createColumnMutation.isPending || isRefetchingColumns ? (
                       <>
                         <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
-                        Creating...
+                        {createColumnMutation.isPending
+                          ? 'Creating...'
+                          : 'Updating...'}
                       </>
                     ) : (
                       <>
@@ -305,7 +305,17 @@ export function KanbanSettingsDialog({
               <Separator />
 
               {/* Manage Columns */}
-              <div className="space-y-4">
+              <div className="space-y-4 relative">
+                {/* Loading overlay */}
+                {isRefetchingColumns && !createColumnMutation.isPending && (
+                  <div className="absolute inset-0 bg-background/50 backdrop-blur-sm z-10 flex items-center justify-center rounded-lg">
+                    <div className="flex items-center gap-2 text-sm font-medium">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                      Updating columns...
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-primary" />
@@ -359,14 +369,23 @@ export function KanbanSettingsDialog({
                                 <Button
                                   size="sm"
                                   onClick={() => handleSaveEdit(column.id)}
-                                  disabled={updateColumnMutation.isPending}
+                                  disabled={
+                                    updateColumnMutation.isPending ||
+                                    isRefetchingColumns
+                                  }
                                 >
-                                  <Save className="h-4 w-4" />
+                                  {updateColumnMutation.isPending ||
+                                  isRefetchingColumns ? (
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-transparent" />
+                                  ) : (
+                                    <Save className="h-4 w-4" />
+                                  )}
                                 </Button>
                                 <Button
                                   size="sm"
                                   variant="ghost"
                                   onClick={handleCancelEdit}
+                                  disabled={isRefetchingColumns}
                                 >
                                   <X className="h-4 w-4" />
                                 </Button>
@@ -418,6 +437,7 @@ export function KanbanSettingsDialog({
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleStartEdit(column)}
+                                disabled={isRefetchingColumns}
                               >
                                 <Edit2 className="h-4 w-4" />
                               </Button>
@@ -426,9 +446,17 @@ export function KanbanSettingsDialog({
                                   size="sm"
                                   variant="ghost"
                                   onClick={() => handleDeleteColumn(column)}
-                                  disabled={deleteColumnMutation.isPending}
+                                  disabled={
+                                    deleteColumnMutation.isPending ||
+                                    isRefetchingColumns
+                                  }
                                 >
-                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                  {deleteColumnMutation.isPending ||
+                                  isRefetchingColumns ? (
+                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  )}
                                 </Button>
                               )}
                             </div>

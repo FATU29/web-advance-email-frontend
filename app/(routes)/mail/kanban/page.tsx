@@ -870,7 +870,8 @@ export default function KanbanPage() {
                 <div className="flex items-center gap-3">
                   <h1 className="text-xl font-semibold">Kanban Board</h1>
                   {(kanbanLoading || emailsLoading) && (
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground flex items-center gap-2">
+                      <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-primary"></div>
                       Loading...
                     </span>
                   )}
