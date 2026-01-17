@@ -89,7 +89,7 @@ const useAuth = create<AuthStore>()(
           if (response.data.success && response.data.data) {
             const { accessToken, user } = response.data.data;
             // Only store access token in memory (refresh token is in HttpOnly cookie)
-            setTokens(accessToken, null);
+            setTokens(accessToken);
             set({
               user,
               isLoading: false,
@@ -153,7 +153,7 @@ const useAuth = create<AuthStore>()(
           if (response.data.success && response.data.data) {
             const { accessToken, user } = response.data.data;
             // Only store access token in memory (refresh token is in HttpOnly cookie)
-            setTokens(accessToken, null);
+            setTokens(accessToken);
             set({
               user,
               isLoading: false,
@@ -214,7 +214,7 @@ const useAuth = create<AuthStore>()(
           if (response.data.success && response.data.data) {
             const { accessToken, user } = response.data.data;
             // Only store access token in memory (refresh token is in HttpOnly cookie)
-            setTokens(accessToken, null);
+            setTokens(accessToken);
             set({
               user,
               isLoading: false,
@@ -249,8 +249,9 @@ const useAuth = create<AuthStore>()(
           // Continue with logout even if API call fails
           console.error('Logout API error:', error);
         } finally {
-          // Clear access token from memory
+          // Clear all auth data from localStorage (accessToken + any other auth keys)
           removeTokens();
+          // Clear user data from memory (Zustand store)
           set({
             user: null,
             isLoading: false,
@@ -485,7 +486,7 @@ export const useAuthBroadcastSync = () => {
       if (message.type === 'LOGOUT') {
         // Another tab logged out - sync this tab
         // Don't call logout() API or broadcast again to avoid loops
-        console.log(
+        console.warn(
           '🔄 Logout broadcast received from another tab - syncing...'
         );
 

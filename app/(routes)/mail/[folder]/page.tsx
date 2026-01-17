@@ -10,7 +10,7 @@ import { Sidebar } from '@/components/email/sidebar';
 import { ComposeEmailDialog } from '@/components/email/compose-email-dialog';
 import { SearchResultsView } from '@/components/email/search-results-view';
 import { type Message } from '@/components/ui/chat-message';
-import { ChatDialog } from '@/components/chat/chat-dialog';
+import { KeyboardShortcutsDialog } from '@/components/accessibility';
 import useAuth from '@/lib/stores/use-auth';
 import {
   useMailboxesQuery,
@@ -643,6 +643,9 @@ export default function MailFolderPage({
   //Render
   return (
     <div className="relative flex h-screen w-full flex-col">
+      {/* Keyboard Shortcuts Help - accessible via ? key */}
+      <KeyboardShortcutsDialog />
+
       {isSearchMode ? (
         <SearchResultsView
           onBack={handleCloseSearch}

@@ -67,8 +67,8 @@ export const useLoginMutation = () => {
       try {
         const response = await login(params);
         if (response.data.success && response.data.data) {
-          const { accessToken, refreshToken, user } = response.data.data;
-          setTokens(accessToken, refreshToken);
+          const { accessToken, user } = response.data.data;
+          setTokens(accessToken);
           useAuth.setState({ user, isLoading: false, error: null });
           return user;
         } else {
@@ -144,8 +144,8 @@ export const useVerifyEmailMutation = () => {
       try {
         const response = await verifyEmail(params);
         if (response.data.success && response.data.data) {
-          const { accessToken, refreshToken, user } = response.data.data;
-          setTokens(accessToken, refreshToken);
+          const { accessToken, user } = response.data.data;
+          setTokens(accessToken);
           useAuth.setState({
             user,
             isLoading: false,
@@ -218,8 +218,8 @@ export const useGoogleSignInMutation = () => {
       try {
         const response = await googleSignIn(params);
         if (response.data.success && response.data.data) {
-          const { accessToken, refreshToken, user } = response.data.data;
-          setTokens(accessToken, refreshToken);
+          const { accessToken, user } = response.data.data;
+          setTokens(accessToken);
           useAuth.setState({ user, isLoading: false, error: null });
           return user;
         } else {

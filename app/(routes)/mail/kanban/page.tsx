@@ -21,6 +21,7 @@ import { KanbanFilters } from '@/components/email/kanban-filters';
 import { SnoozeDialog } from '@/components/email/snooze-dialog';
 import { SearchResultsView } from '@/components/email/search-results-view';
 import { KanbanSettingsDialog } from '@/components/email/kanban-settings-dialog';
+import { KeyboardShortcutsDialog } from '@/components/accessibility';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -683,7 +684,7 @@ export default function KanbanPage() {
                   </div>
 
                   {/* Mobile Actions Footer */}
-                  <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+                  <div className="border-t bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/80">
                     {/* Status Bar */}
                     {(kanbanLoading || emailsLoading || isSyncing) && (
                       <div className="px-4 py-1 text-xs text-center text-muted-foreground border-b bg-muted/30">
@@ -828,6 +829,9 @@ export default function KanbanPage() {
 
   return (
     <div className="flex h-screen flex-col">
+      {/* Keyboard Shortcuts Help */}
+      <KeyboardShortcutsDialog />
+
       {isSearchMode ? (
         <SearchResultsView
           onBack={handleCloseSearch}

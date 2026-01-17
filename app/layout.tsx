@@ -5,6 +5,7 @@ import QueryProvider from '@/providers/QueryProvider';
 import AuthProvider from '@/providers/AuthProvider';
 import AuthGuardProvider from '@/providers/AuthGuardProvider';
 import { Toaster } from '@/components/ui/sonner';
+import { SkipNavigation } from '@/components/accessibility';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -32,6 +33,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
+        <SkipNavigation />
         <QueryProvider>
           <AuthProvider>
             <AuthGuardProvider>{children}</AuthGuardProvider>
