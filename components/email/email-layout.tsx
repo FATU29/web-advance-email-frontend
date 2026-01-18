@@ -38,7 +38,7 @@ export interface EmailLayoutProps {
   onEmailClick?: (email: IEmailListItem) => void;
   onSelectAll?: (selected: boolean) => void;
   onBulkAction?: (
-    action: 'read' | 'unread' | 'star' | 'unstar' | 'delete' | 'archive',
+    action: 'read' | 'unread' | 'star' | 'unstar' | 'delete',
     emailIds: string[]
   ) => void;
   focusedEmailIndex?: number;
@@ -50,7 +50,6 @@ export interface EmailLayoutProps {
   onReply?: (email: IEmailDetail) => void;
   onReplyAll?: (email: IEmailDetail) => void;
   onForward?: (email: IEmailDetail) => void;
-  onArchive?: (emailId: string) => void;
   onDelete?: (emailId: string) => void;
   onStar?: (emailId: string, starred: boolean) => void;
   onToggleKanban?: () => void;
@@ -80,7 +79,6 @@ export function EmailLayout({
   onReply,
   onReplyAll,
   onForward,
-  onArchive,
   onDelete,
   onStar,
   onToggleKanban,
@@ -173,7 +171,6 @@ export function EmailLayout({
                   onReply={onReply}
                   onReplyAll={onReplyAll}
                   onForward={onForward}
-                  onArchive={onArchive}
                   onDelete={onDelete}
                   onStar={onStar}
                 />
@@ -254,7 +251,6 @@ export function EmailLayout({
                   onReply={onReply}
                   onReplyAll={onReplyAll}
                   onForward={onForward}
-                  onArchive={onArchive}
                   onDelete={onDelete}
                   onStar={onStar}
                 />

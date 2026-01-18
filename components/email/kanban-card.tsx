@@ -134,8 +134,13 @@ export function KanbanCard({
   const senderName = email.fromName || email.from.split('@')[0];
   const senderEmail = email.from;
 
+  // Check if email is unread - handle both 'read' and 'isRead' fields from API
+  const isUnread = !(email.isRead ?? (email as any).read ?? false);
+
   //Init event handle
   const handleOpen = () => {
+    // Don't open detail page if dialog is open
+    if (isDialogOpen) return;
     onOpen?.(email);
   };
 
@@ -161,7 +166,7 @@ export function KanbanCard({
       {...attributes}
       className={cn(
         'group transition-all duration-150 hover:shadow-lg border-2 will-change-transform',
-        !email.isRead && 'border-l-4 border-l-primary',
+        isUnread && 'border-l-4 border-l-primary',
         isDragging && 'opacity-40 scale-95 shadow-xl rotate-1',
         !isDragging && 'hover:scale-[1.01]'
       )}
@@ -176,20 +181,30 @@ export function KanbanCard({
         {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Avatar className="size-7 shrink-0">
-              <AvatarImage src={senderEmail} alt={senderName} />
-              <AvatarFallback
-                className={cn(
-                  'text-xs text-white font-semibold',
-                  getAvatarColor(senderName, senderEmail)
-                )}
-              >
-                {getInitials(senderName, senderEmail)}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="size-7 shrink-0">
+                <AvatarImage src={senderEmail} alt={senderName} />
+                <AvatarFallback
+                  className={cn(
+                    'text-xs text-white font-semibold',
+                    getAvatarColor(senderName, senderEmail)
+                  )}
+                >
+                  {getInitials(senderName, senderEmail)}
+                </AvatarFallback>
+              </Avatar>
+              {isUnread && (
+                <div className="absolute -top-0.5 -right-0.5 size-2.5 bg-blue-600 rounded-full border-2 border-white dark:border-gray-800 shadow-sm" />
+              )}
+            </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium truncate">
+                <span
+                  className={cn(
+                    'text-sm truncate',
+                    isUnread ? 'font-bold' : 'font-medium'
+                  )}
+                >
                   {senderName || senderEmail}
                 </span>
                 {email.isStarred && (
@@ -262,7 +277,12 @@ export function KanbanCard({
 
         {/* Subject */}
         <div>
-          <h4 className="text-xs font-semibold line-clamp-2 mb-0.5">
+          <h4
+            className={cn(
+              'text-xs line-clamp-2 mb-0.5',
+              isUnread ? 'font-bold' : 'font-semibold'
+            )}
+          >
             {email.subject || '(No Subject)'}
           </h4>
         </div>

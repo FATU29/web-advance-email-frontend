@@ -178,13 +178,7 @@ export interface IGetEmailsParams {
   pageToken?: string | null;
 }
 
-export type EmailAction =
-  | 'read'
-  | 'unread'
-  | 'star'
-  | 'unstar'
-  | 'delete'
-  | 'archive';
+export type EmailAction = 'read' | 'unread' | 'star' | 'unstar' | 'delete';
 
 export interface IBulkEmailActionParams {
   emailIds: string[];

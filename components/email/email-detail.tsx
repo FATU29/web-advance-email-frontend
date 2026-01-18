@@ -8,7 +8,6 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import {
   ArrowLeft,
-  Archive,
   Paperclip,
   Reply,
   ReplyAll,
@@ -35,6 +34,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { IEmailDetail } from '@/types/api.types';
 import { cn } from '@/lib/utils';
 import EmailService from '@/services/email.service';
+import { useMarkEmailAsReadMutation } from '@/hooks/use-email-mutations';
 
 export interface EmailDetailProps {
   email: IEmailDetail;
@@ -42,7 +42,6 @@ export interface EmailDetailProps {
   onReply?: (email: IEmailDetail) => void;
   onReplyAll?: (email: IEmailDetail) => void;
   onForward?: (email: IEmailDetail) => void;
-  onArchive?: (emailId: string) => void;
   onDelete?: (emailId: string) => void;
   onStar?: (emailId: string, starred: boolean) => void;
 }
@@ -53,10 +52,29 @@ export function EmailDetail({
   onReply,
   onReplyAll,
   onForward,
-  onArchive,
   onDelete,
   onStar,
 }: EmailDetailProps) {
+  // Use mutation to mark email as read
+  const markAsReadMutation = useMarkEmailAsReadMutation();
+
+  // Mark email as read when component mounts
+  React.useEffect(() => {
+    // Check if email is unread - handle both 'read' and 'isRead' fields
+    const isUnread = !(email.isRead ?? (email as any).read ?? false);
+
+    if (isUnread && email.id) {
+      markAsReadMutation.mutate(email.id, {
+        onSuccess: () => {
+          console.log('Email marked as read:', email.id);
+        },
+        onError: (error) => {
+          console.error('Failed to mark email as read:', error);
+        },
+      });
+    }
+  }, [email.id]); // Only run when email.id changes
+
   //Init util function
   const getInitials = (name?: string, email?: string) => {
     if (name) {
@@ -838,16 +856,6 @@ export function EmailDetail({
             )}
           </div>
           <div className="flex items-center gap-1">
-            {onArchive && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onArchive(email.id)}
-                className="size-8"
-              >
-                <Archive className="size-4" />
-              </Button>
-            )}
             {onDelete && (
               <Button
                 variant="ghost"

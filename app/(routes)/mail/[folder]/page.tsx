@@ -20,7 +20,9 @@ import {
   useToggleEmailStarMutation,
   useMarkEmailAsReadMutation,
   useBulkEmailActionMutation,
+  emailQueryKeys,
 } from '@/hooks/use-email-mutations';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   IEmailListItem,
   IEmailDetail,
@@ -36,6 +38,7 @@ export default function MailFolderPage({
   const router = useRouter();
   const logout = useAuth((state) => state.logout);
   const user = useAuth((state) => state.user);
+  const queryClient = useQueryClient();
 
   // Unwrap params promise
   const resolvedParams = React.use(params);
@@ -214,10 +217,24 @@ export default function MailFolderPage({
 
   const handleEmailClick = (email: IEmailListItem) => {
     setSelectedEmailId(email.id);
-    // Mark as read if unread
-    if (!email.isRead) {
+    // Mark as read if unread - check both 'read' and 'isRead' fields
+    const isUnread = !(email.isRead ?? (email as any).read ?? false);
+    if (isUnread) {
+      // Update local state immediately for optimistic UI
+      setEmailsList((prevList) =>
+        prevList.map((e) =>
+          e.id === email.id ? { ...e, isRead: true, read: true } : e
+        )
+      );
+
       markAsReadMutation.mutate(email.id, {
         onError: (error) => {
+          // Revert on error
+          setEmailsList((prevList) =>
+            prevList.map((e) =>
+              e.id === email.id ? { ...e, isRead: false, read: false } : e
+            )
+          );
           toast.error(
             error instanceof Error
               ? error.message
@@ -246,39 +263,38 @@ export default function MailFolderPage({
     setComposeOpen(true);
   };
 
-  const handleArchive = (emailId: string) => {
-    bulkActionMutation.mutate(
-      {
-        emailIds: [emailId],
-        action: 'archive',
-      },
-      {
-        onSuccess: () => {
-          toast.success('Email archived successfully');
-          // Update local email list immediately
-          setEmailsList((prevList) => prevList.filter((e) => e.id !== emailId));
-          // Clear selected email if it was the archived one
-          if (selectedEmailId === emailId) {
-            setSelectedEmailId(null);
-          }
-          // Clear from selection
-          const newSelected = new Set(selectedEmails);
-          newSelected.delete(emailId);
-          setSelectedEmails(newSelected);
-        },
-        onError: (error) => {
-          toast.error(
-            error instanceof Error ? error.message : 'Failed to archive email'
-          );
-        },
-      }
-    );
-  };
-
   const handleBulkAction = (
-    action: 'read' | 'unread' | 'star' | 'unstar' | 'delete' | 'archive',
+    action: 'read' | 'unread' | 'star' | 'unstar' | 'delete',
     emailIds: string[]
   ) => {
+    // Optimistic update immediately
+    if (action === 'delete') {
+      setEmailsList((prevList) =>
+        prevList.filter((e) => !emailIds.includes(e.id))
+      );
+    } else if (action === 'read') {
+      setEmailsList((prevList) =>
+        prevList.map((e) =>
+          emailIds.includes(e.id) ? { ...e, isRead: true, read: true } : e
+        )
+      );
+    } else if (action === 'unread') {
+      setEmailsList((prevList) =>
+        prevList.map((e) =>
+          emailIds.includes(e.id) ? { ...e, isRead: false, read: false } : e
+        )
+      );
+    } else if (action === 'star' || action === 'unstar') {
+      const starred = action === 'star';
+      setEmailsList((prevList) =>
+        prevList.map((e) =>
+          emailIds.includes(e.id)
+            ? { ...e, isStarred: starred, starred: starred }
+            : e
+        )
+      );
+    }
+
     bulkActionMutation.mutate(
       {
         emailIds,
@@ -292,30 +308,32 @@ export default function MailFolderPage({
             star: 'starred',
             unstar: 'unstarred',
             delete: 'deleted',
-            archive: 'archived',
           };
           toast.success(
             `${emailIds.length} email(s) ${actionLabels[action]} successfully`
           );
-          // Update local email list immediately for delete/archive actions
-          if (action === 'delete' || action === 'archive') {
-            setEmailsList((prevList) =>
-              prevList.filter((e) => !emailIds.includes(e.id))
-            );
-          }
+
           // Clear selection after action
           setSelectedEmails(new Set());
           // Clear selected email if it was in the list
           if (selectedEmailId && emailIds.includes(selectedEmailId)) {
-            if (action === 'delete' || action === 'archive') {
+            if (action === 'delete') {
               setSelectedEmailId(null);
             }
           }
         },
         onError: (error) => {
+          // Revert optimistic update on error
           toast.error(
             error instanceof Error ? error.message : 'Failed to perform action'
           );
+          // Refetch to get correct state
+          if (emailsData?.pages) {
+            const allEmails = emailsData.pages.flatMap(
+              (page) => (page as IPaginatedResponse<IEmailListItem>).content
+            );
+            setEmailsList(allEmails);
+          }
         },
       }
     );
@@ -361,6 +379,9 @@ export default function MailFolderPage({
   };
 
   const handleSidebarItemClick = (itemId: string) => {
+    // Remove all emails cache to force fresh API call
+    queryClient.removeQueries({ queryKey: emailQueryKeys.emails() });
+
     // Navigate to folder
     router.push(ROUTES.MAIL_FOLDER(itemId));
   };
@@ -553,21 +574,6 @@ export default function MailFolderPage({
     }
   }, [selectedEmailId, focusedEmailIndex, emails, handleDelete]);
 
-  const handleArchiveFocused = React.useCallback(() => {
-    if (selectedEmailId) {
-      handleArchive(selectedEmailId);
-    } else if (focusedEmailIndex >= 0 && focusedEmailIndex < emails.length) {
-      const email = emails[focusedEmailIndex];
-      handleArchive(email.id);
-      // Move focus to next email if available
-      if (focusedEmailIndex < emails.length - 1) {
-        setFocusedEmailIndex(focusedEmailIndex);
-      } else if (focusedEmailIndex > 0) {
-        setFocusedEmailIndex(focusedEmailIndex - 1);
-      }
-    }
-  }, [selectedEmailId, focusedEmailIndex, emails, handleArchive]);
-
   const handleReplyFocused = React.useCallback(() => {
     if (selectedEmail && selectedEmailId) {
       handleReply(selectedEmail);
@@ -615,7 +621,6 @@ export default function MailFolderPage({
     onMarkUnread: handleMarkUnread,
     onToggleStar: handleToggleStarFocused,
     onDelete: handleDeleteFocused,
-    onArchive: handleArchiveFocused,
     onReply: handleReplyFocused,
     onReplyAll: handleReplyAllFocused,
     onForward: handleForwardFocused,
@@ -691,7 +696,6 @@ export default function MailFolderPage({
           onReply={handleReply}
           onReplyAll={handleReplyAll}
           onForward={handleForward}
-          onArchive={handleArchive}
           onDelete={handleDelete}
           onStar={handleStar}
           error={

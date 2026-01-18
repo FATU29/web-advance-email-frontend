@@ -97,8 +97,22 @@ export function EmailItem({
     }
   };
 
-  // Check if email is unread
-  const isUnread = email.isRead === false;
+  // Check if email is unread - handle both 'read' and 'isRead' fields from API
+  // API returns 'read' but type interface uses 'isRead'
+  const isUnread = !(email.isRead ?? (email as any).read ?? false);
+
+  // Debug log to check email data
+  React.useEffect(() => {
+    if (email.subject === 'Hello WOrld') {
+      console.log('Email data:', {
+        id: email.id,
+        subject: email.subject,
+        isRead: email.isRead,
+        read: (email as any).read,
+        isUnread: isUnread,
+      });
+    }
+  }, [email, isUnread]);
 
   //Render
   return (
@@ -131,25 +145,35 @@ export function EmailItem({
               onCheckedChange={handleCheckboxChange}
               className="opacity-0 group-hover:opacity-100 data-[state=checked]:opacity-100 transition-opacity"
             />
-            {/* Unread indicator - only show when email is unread */}
-            {isUnread && (
-              <div className="absolute -left-1.5 top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-primary ring-2 ring-background" />
+            {/* Unread indicator - only show when email is unread and checkbox is not visible */}
+            {isUnread && !isSelected && (
+              <div className="absolute -left-1.5 top-1/2 size-2 md:size-2.5 -translate-y-1/2 rounded-full bg-blue-600 ring-2 ring-background shadow-sm group-hover:opacity-0 transition-opacity" />
             )}
           </div>
 
-          {/* Avatar */}
+          {/* Avatar with unread indicator */}
           {!isCompact && (
-            <Avatar className="size-8 shrink-0 md:size-10">
-              <AvatarImage src={senderEmail} alt={senderName} />
-              <AvatarFallback
-                className={cn(
-                  'text-white text-xs md:text-sm font-semibold',
-                  getAvatarColor(senderName, senderEmail)
-                )}
-              >
-                {getInitials(senderName, senderEmail)}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="size-8 shrink-0 md:size-10">
+                <AvatarImage src={senderEmail} alt={senderName} />
+                <AvatarFallback
+                  className={cn(
+                    'text-white text-xs md:text-sm font-semibold',
+                    getAvatarColor(senderName, senderEmail)
+                  )}
+                >
+                  {getInitials(senderName, senderEmail)}
+                </AvatarFallback>
+              </Avatar>
+              {isUnread && (
+                <div className="absolute -top-0.5 -right-0.5 size-2.5 md:size-3 bg-blue-600 rounded-full border-2 border-white dark:border-gray-800 shadow-sm" />
+              )}
+            </div>
+          )}
+
+          {/* Compact mode unread indicator */}
+          {isCompact && isUnread && (
+            <div className="size-2 md:size-2.5 shrink-0 rounded-full bg-blue-600 shadow-sm mt-1.5" />
           )}
 
           {/* Content */}
@@ -160,9 +184,9 @@ export function EmailItem({
                 {/* Sender */}
                 <span
                   className={cn(
-                    'truncate text-xs md:text-sm font-medium',
+                    'truncate text-xs md:text-sm',
                     isUnread
-                      ? 'font-semibold text-foreground'
+                      ? 'font-bold text-foreground'
                       : 'font-normal text-muted-foreground'
                   )}
                 >

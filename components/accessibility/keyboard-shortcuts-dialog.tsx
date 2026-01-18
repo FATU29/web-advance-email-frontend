@@ -60,7 +60,6 @@ const KEYBOARD_SHORTCUTS: ShortcutCategory[] = [
         action: 'Reply all',
         description: 'Reply to all recipients',
       },
-      { keys: ['a'], action: 'Archive', description: 'Archive current email' },
       {
         keys: ['s'],
         action: 'Star/Unstar',

@@ -251,14 +251,80 @@ export const useBulkEmailActionMutation = () => {
     mutationFn: async (params: IBulkEmailActionParams) => {
       const response = await bulkEmailAction(params);
       if (response.data.success) {
-        return response.data;
+        return { ...response.data, params };
       }
       throw new Error(response.data.message || 'Bulk action failed');
     },
-    onSuccess: () => {
-      // Invalidate all email queries to refresh data
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.mailboxes() });
+    onSuccess: (data) => {
+      const { params } = data;
+      const { emailIds, action } = params;
+
+      // Update infinite query caches based on action
+      if (action === 'read' || action === 'unread') {
+        const isRead = action === 'read';
+        queryClient.setQueriesData<
+          InfiniteData<IPaginatedResponse<IEmailListItem>>
+        >({ queryKey: emailQueryKeys.emails() }, (oldData) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page) => ({
+              ...page,
+              content: page.content.map((email) =>
+                emailIds.includes(email.id)
+                  ? { ...email, isRead, read: isRead }
+                  : email
+              ),
+            })),
+          };
+        });
+      } else if (action === 'star' || action === 'unstar') {
+        const starred = action === 'star';
+        queryClient.setQueriesData<
+          InfiniteData<IPaginatedResponse<IEmailListItem>>
+        >({ queryKey: emailQueryKeys.emails() }, (oldData) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page) => ({
+              ...page,
+              content: page.content.map((email) =>
+                emailIds.includes(email.id)
+                  ? { ...email, isStarred: starred, starred }
+                  : email
+              ),
+            })),
+          };
+        });
+      } else if (action === 'delete') {
+        // For delete, remove from cache
+        queryClient.setQueriesData<
+          InfiniteData<IPaginatedResponse<IEmailListItem>>
+        >({ queryKey: emailQueryKeys.emails() }, (oldData) => {
+          if (!oldData) return oldData;
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page) => ({
+              ...page,
+              content: page.content.filter(
+                (email) => !emailIds.includes(email.id)
+              ),
+            })),
+          };
+        });
+      }
+
+      // Invalidate mailboxes to update unread counts
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.mailboxes(),
+        refetchType: 'all',
+      });
+
+      // Force refetch emails list for all actions to update cache immediately
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.emails(),
+        refetchType: 'all',
+      });
     },
   });
 };
@@ -273,26 +339,54 @@ export const useMarkEmailAsReadMutation = () => {
     mutationFn: async (emailId: string) => {
       const response = await markEmailAsRead(emailId);
       if (response.data.success) {
-        // Update email in list and selected email
-        useEmail.setState((state) => ({
-          emails: state.emails.map((e) =>
-            e.id === emailId ? { ...e, isRead: true } : e
-          ),
-          selectedEmail:
-            state.selectedEmail?.id === emailId
-              ? { ...state.selectedEmail, isRead: true }
-              : state.selectedEmail,
-        }));
         return response.data;
       }
       throw new Error(response.data.message || 'Failed to mark email as read');
     },
     onSuccess: (_, emailId) => {
+      // Update all infinite query caches
+      queryClient.setQueriesData<
+        InfiniteData<IPaginatedResponse<IEmailListItem>>
+      >({ queryKey: emailQueryKeys.emails() }, (oldData) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page) => ({
+            ...page,
+            content: page.content.map((email) =>
+              email.id === emailId
+                ? { ...email, isRead: true, read: true }
+                : email
+            ),
+          })),
+        };
+      });
+
+      // Update Zustand store
+      useEmail.setState((state) => ({
+        emails: state.emails.map((e) =>
+          e.id === emailId ? { ...e, isRead: true, read: true } : e
+        ),
+        selectedEmail:
+          state.selectedEmail?.id === emailId
+            ? { ...state.selectedEmail, isRead: true }
+            : state.selectedEmail,
+      }));
+
+      // Invalidate related queries
       queryClient.invalidateQueries({
         queryKey: emailQueryKeys.email(emailId),
       });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.mailboxes() });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.mailboxes(),
+        refetchType: 'all',
+      });
+
+      // Force refetch emails list to update cache immediately
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.emails(),
+        refetchType: 'all',
+      });
     },
   });
 };
@@ -307,16 +401,6 @@ export const useMarkEmailAsUnreadMutation = () => {
     mutationFn: async (emailId: string) => {
       const response = await markEmailAsUnread(emailId);
       if (response.data.success) {
-        // Update email in list and selected email
-        useEmail.setState((state) => ({
-          emails: state.emails.map((e) =>
-            e.id === emailId ? { ...e, isRead: false } : e
-          ),
-          selectedEmail:
-            state.selectedEmail?.id === emailId
-              ? { ...state.selectedEmail, isRead: false }
-              : state.selectedEmail,
-        }));
         return response.data;
       }
       throw new Error(
@@ -324,11 +408,49 @@ export const useMarkEmailAsUnreadMutation = () => {
       );
     },
     onSuccess: (_, emailId) => {
+      // Update all infinite query caches
+      queryClient.setQueriesData<
+        InfiniteData<IPaginatedResponse<IEmailListItem>>
+      >({ queryKey: emailQueryKeys.emails() }, (oldData) => {
+        if (!oldData) return oldData;
+        return {
+          ...oldData,
+          pages: oldData.pages.map((page) => ({
+            ...page,
+            content: page.content.map((email) =>
+              email.id === emailId
+                ? { ...email, isRead: false, read: false }
+                : email
+            ),
+          })),
+        };
+      });
+
+      // Update Zustand store
+      useEmail.setState((state) => ({
+        emails: state.emails.map((e) =>
+          e.id === emailId ? { ...e, isRead: false, read: false } : e
+        ),
+        selectedEmail:
+          state.selectedEmail?.id === emailId
+            ? { ...state.selectedEmail, isRead: false }
+            : state.selectedEmail,
+      }));
+
+      // Invalidate related queries
       queryClient.invalidateQueries({
         queryKey: emailQueryKeys.email(emailId),
       });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.mailboxes() });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.mailboxes(),
+        refetchType: 'all',
+      });
+
+      // Force refetch emails list to update cache immediately
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.emails(),
+        refetchType: 'all',
+      });
     },
   });
 };
@@ -367,8 +489,14 @@ export const useToggleEmailStarMutation = () => {
       queryClient.invalidateQueries({
         queryKey: emailQueryKeys.email(emailId),
       });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.mailboxes() });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.emails(),
+        refetchType: 'all',
+      });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.mailboxes(),
+        refetchType: 'all',
+      });
       // Invalidate kanban queries to update UI in kanban board
       queryClient.invalidateQueries({ queryKey: ['kanban'] });
     },
@@ -396,8 +524,14 @@ export const useDeleteEmailMutation = () => {
       throw new Error(response.data.message || 'Failed to delete email');
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.mailboxes() });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.emails(),
+        refetchType: 'all',
+      });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.mailboxes(),
+        refetchType: 'all',
+      });
     },
   });
 };
@@ -418,8 +552,14 @@ export const useSendEmailMutation = () => {
     },
     onSuccess: () => {
       // Invalidate emails to refresh sent folder
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.mailboxes() });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.emails(),
+        refetchType: 'all',
+      });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.mailboxes(),
+        refetchType: 'all',
+      });
     },
   });
 };
@@ -446,8 +586,14 @@ export const useReplyEmailMutation = () => {
     },
     onSuccess: () => {
       // Invalidate emails to refresh sent folder
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.mailboxes() });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.emails(),
+        refetchType: 'all',
+      });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.mailboxes(),
+        refetchType: 'all',
+      });
     },
   });
 };
@@ -484,7 +630,10 @@ export const useUpdateKanbanStatusMutation = () => {
       queryClient.invalidateQueries({
         queryKey: emailQueryKeys.email(emailId),
       });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.emails(),
+        refetchType: 'all',
+      });
     },
   });
 };
@@ -521,7 +670,10 @@ export const useSnoozeEmailMutation = () => {
       queryClient.invalidateQueries({
         queryKey: emailQueryKeys.email(emailId),
       });
-      queryClient.invalidateQueries({ queryKey: emailQueryKeys.emails() });
+      queryClient.invalidateQueries({
+        queryKey: emailQueryKeys.emails(),
+        refetchType: 'all',
+      });
     },
   });
 };

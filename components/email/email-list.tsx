@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Loader2, Archive, Trash2, Star, Mail, MailOpen } from 'lucide-react';
+import { Loader2, Trash2, Star, Mail, MailOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 
@@ -25,7 +25,7 @@ export interface EmailListProps extends MailListProps {
   onEmailClick?: (email: IEmailListItem) => void;
   onSelectAll?: (selected: boolean) => void;
   onBulkAction?: (
-    action: 'read' | 'unread' | 'star' | 'unstar' | 'delete' | 'archive',
+    action: 'read' | 'unread' | 'star' | 'unstar' | 'delete',
     emailIds: string[]
   ) => void;
   onToggleKanban?: () => void;
@@ -324,7 +324,7 @@ export function EmailList({
 
   //Init event handle
   const handleBulkActionClick = (
-    action: 'read' | 'unread' | 'star' | 'unstar' | 'delete' | 'archive'
+    action: 'read' | 'unread' | 'star' | 'unstar' | 'delete'
   ) => {
     if (localSelected.size > 0 && onBulkAction) {
       onBulkAction(action, Array.from(localSelected));
@@ -378,15 +378,6 @@ export function EmailList({
               >
                 <Star className="size-3.5 fill-yellow-500 text-yellow-500" />
                 <span className="hidden sm:inline">Unstar</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleBulkActionClick('archive')}
-                className="h-8 gap-1.5"
-              >
-                <Archive className="size-3.5" />
-                <span className="hidden sm:inline">Archive</span>
               </Button>
               <Button
                 variant="ghost"
