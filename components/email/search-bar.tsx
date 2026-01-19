@@ -219,57 +219,65 @@ export function SearchBar({
         {hasSuggestions && (
           <div
             ref={suggestionsRef}
-            className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-50 max-h-[400px] sm:max-h-[300px] animate-in fade-in slide-in-from-top-2"
+            className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-50 animate-in fade-in slide-in-from-top-2"
           >
-            <ScrollArea className="max-h-[400px] sm:max-h-[300px]">
-              <div className="p-1">
+            <div className="max-h-[400px] sm:max-h-[300px] overflow-auto">
+              <div className="p-1 space-y-1">
                 {/* Contacts Section */}
                 {suggestions && suggestions.contacts.length > 0 && (
                   <>
-                    <div className="px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30 flex items-center gap-2">
-                      <User className="h-3 w-3" />
-                      Contacts
-                      <Badge variant="secondary" className="ml-auto text-xs">
+                    <div className="px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30 flex items-center gap-2 sticky top-0 z-10 backdrop-blur-sm">
+                      <User className="h-3 w-3 shrink-0" />
+                      <span className="truncate">Contacts</span>
+                      <Badge
+                        variant="secondary"
+                        className="ml-auto text-xs shrink-0"
+                      >
                         {suggestions.contacts.length}
                       </Badge>
                     </div>
-                    {suggestions.contacts.map((contact) => {
-                      const flatIndex = flatSuggestions.findIndex(
-                        (s) =>
-                          s.type === 'contact' &&
-                          s.value === `from:${contact.email}`
-                      );
-                      return (
-                        <div
-                          key={contact.email}
-                          data-suggestion-index={flatIndex}
-                          className={cn(
-                            'flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-all',
-                            selectedIndex === flatIndex
-                              ? 'bg-primary text-primary-foreground shadow-sm scale-[1.02]'
-                              : 'hover:bg-accent/70 hover:shadow-sm'
-                          )}
-                          onClick={() =>
-                            handleSuggestionClick(`from:${contact.email}`)
-                          }
-                        >
-                          <div className="h-8 w-8 rounded-full bg-linear-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold shrink-0 text-xs">
-                            {contact.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-semibold truncate">
-                              {contact.name}
+                    <div className="space-y-1 px-1">
+                      {suggestions.contacts.map((contact) => {
+                        const flatIndex = flatSuggestions.findIndex(
+                          (s) =>
+                            s.type === 'contact' &&
+                            s.value === `from:${contact.email}`
+                        );
+                        return (
+                          <div
+                            key={contact.email}
+                            data-suggestion-index={flatIndex}
+                            className={cn(
+                              'flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-all',
+                              selectedIndex === flatIndex
+                                ? 'bg-primary text-primary-foreground shadow-sm scale-[1.02]'
+                                : 'hover:bg-accent/70 hover:shadow-sm'
+                            )}
+                            onClick={() =>
+                              handleSuggestionClick(`from:${contact.email}`)
+                            }
+                          >
+                            <div className="h-8 w-8 rounded-full bg-linear-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-semibold shrink-0 text-xs">
+                              {contact.name.charAt(0).toUpperCase()}
                             </div>
-                            <div className="text-xs opacity-70 truncate">
-                              {contact.email}
+                            <div className="flex-1 min-w-0 overflow-hidden">
+                              <div className="text-sm font-semibold truncate">
+                                {contact.name}
+                              </div>
+                              <div className="text-xs opacity-70 truncate">
+                                {contact.email}
+                              </div>
                             </div>
+                            <Badge
+                              variant="outline"
+                              className="shrink-0 text-xs"
+                            >
+                              {contact.emailCount}
+                            </Badge>
                           </div>
-                          <Badge variant="outline" className="shrink-0 text-xs">
-                            {contact.emailCount}
-                          </Badge>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                     {(suggestions.keywords.length > 0 ||
                       suggestions.recentSearches.length > 0) && (
                       <Separator className="my-2" />
@@ -280,47 +288,57 @@ export function SearchBar({
                 {/* Keywords Section */}
                 {suggestions && suggestions.keywords.length > 0 && (
                   <>
-                    <div className="px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30 flex items-center gap-2">
-                      <Hash className="h-3 w-3" />
-                      Keywords
-                      <Badge variant="secondary" className="ml-auto text-xs">
+                    <div className="px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30 flex items-center gap-2 sticky top-0 z-10 backdrop-blur-sm">
+                      <Hash className="h-3 w-3 shrink-0" />
+                      <span className="truncate">Keywords</span>
+                      <Badge
+                        variant="secondary"
+                        className="ml-auto text-xs shrink-0"
+                      >
                         {suggestions.keywords.length}
                       </Badge>
                     </div>
-                    {suggestions.keywords.map((keyword) => {
-                      const flatIndex = flatSuggestions.findIndex(
-                        (s) =>
-                          s.type === 'keyword' && s.value === keyword.keyword
-                      );
-                      return (
-                        <div
-                          key={keyword.keyword}
-                          data-suggestion-index={flatIndex}
-                          className={cn(
-                            'flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-all',
-                            selectedIndex === flatIndex
-                              ? 'bg-primary text-primary-foreground shadow-sm scale-[1.02]'
-                              : 'hover:bg-accent/70 hover:shadow-sm'
-                          )}
-                          onClick={() => handleSuggestionClick(keyword.keyword)}
-                        >
-                          <div className="h-8 w-8 rounded-md bg-linear-to-br from-green-500 to-emerald-500 flex items-center justify-center text-white shrink-0">
-                            <Hash className="h-4 w-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">
-                              {keyword.keyword}
+                    <div className="space-y-1 px-1">
+                      {suggestions.keywords.map((keyword) => {
+                        const flatIndex = flatSuggestions.findIndex(
+                          (s) =>
+                            s.type === 'keyword' && s.value === keyword.keyword
+                        );
+                        return (
+                          <div
+                            key={keyword.keyword}
+                            data-suggestion-index={flatIndex}
+                            className={cn(
+                              'flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-all',
+                              selectedIndex === flatIndex
+                                ? 'bg-primary text-primary-foreground shadow-sm scale-[1.02]'
+                                : 'hover:bg-accent/70 hover:shadow-sm'
+                            )}
+                            onClick={() =>
+                              handleSuggestionClick(keyword.keyword)
+                            }
+                          >
+                            <div className="h-8 w-8 rounded-md bg-linear-to-br from-green-500 to-emerald-500 flex items-center justify-center text-white shrink-0">
+                              <Hash className="h-4 w-4" />
                             </div>
-                            <div className="text-xs opacity-70">
-                              Found in subject or content
+                            <div className="flex-1 min-w-0 overflow-hidden">
+                              <div className="text-sm font-medium truncate">
+                                {keyword.keyword}
+                              </div>
+                              <div className="text-xs opacity-70 truncate">
+                                Found in subject or content
+                              </div>
                             </div>
+                            <Badge
+                              variant="outline"
+                              className="shrink-0 text-xs"
+                            >
+                              {keyword.frequency}x
+                            </Badge>
                           </div>
-                          <Badge variant="outline" className="shrink-0 text-xs">
-                            {keyword.frequency}x
-                          </Badge>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                     {suggestions.recentSearches.length > 0 && (
                       <Separator className="my-2" />
                     )}
@@ -330,43 +348,48 @@ export function SearchBar({
                 {/* Recent Searches Section */}
                 {suggestions && suggestions.recentSearches.length > 0 && (
                   <>
-                    <div className="px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30 flex items-center gap-2">
-                      <Clock className="h-3 w-3" />
-                      Recent Searches
-                      <Badge variant="secondary" className="ml-auto text-xs">
+                    <div className="px-3 py-2 text-xs font-bold text-muted-foreground uppercase tracking-wider bg-muted/30 flex items-center gap-2 sticky top-0 z-10 backdrop-blur-sm">
+                      <Clock className="h-3 w-3 shrink-0" />
+                      <span className="truncate">Recent Searches</span>
+                      <Badge
+                        variant="secondary"
+                        className="ml-auto text-xs shrink-0"
+                      >
                         {suggestions.recentSearches.length}
                       </Badge>
                     </div>
-                    {suggestions.recentSearches.map((search) => {
-                      const flatIndex = flatSuggestions.findIndex(
-                        (s) => s.type === 'recent' && s.value === search
-                      );
-                      return (
-                        <div
-                          key={search}
-                          data-suggestion-index={flatIndex}
-                          className={cn(
-                            'flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-all',
-                            selectedIndex === flatIndex
-                              ? 'bg-primary text-primary-foreground shadow-sm scale-[1.02]'
-                              : 'hover:bg-accent/70 hover:shadow-sm'
-                          )}
-                          onClick={() => handleSuggestionClick(search)}
-                        >
-                          <div className="h-8 w-8 rounded-md bg-linear-to-br from-orange-500 to-red-500 flex items-center justify-center text-white shrink-0">
-                            <Clock className="h-4 w-4" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">
-                              {search}
+                    <div className="space-y-1 px-1">
+                      {suggestions.recentSearches.map((search) => {
+                        const flatIndex = flatSuggestions.findIndex(
+                          (s) => s.type === 'recent' && s.value === search
+                        );
+                        return (
+                          <div
+                            key={search}
+                            data-suggestion-index={flatIndex}
+                            className={cn(
+                              'flex items-center gap-3 px-3 py-2.5 rounded-md cursor-pointer transition-all',
+                              selectedIndex === flatIndex
+                                ? 'bg-primary text-primary-foreground shadow-sm scale-[1.02]'
+                                : 'hover:bg-accent/70 hover:shadow-sm'
+                            )}
+                            onClick={() => handleSuggestionClick(search)}
+                          >
+                            <div className="h-8 w-8 rounded-md bg-linear-to-br from-orange-500 to-red-500 flex items-center justify-center text-white shrink-0">
+                              <Clock className="h-4 w-4" />
                             </div>
-                            <div className="text-xs opacity-70">
-                              Previous search
+                            <div className="flex-1 min-w-0 overflow-hidden">
+                              <div className="text-sm font-medium truncate">
+                                {search}
+                              </div>
+                              <div className="text-xs opacity-70 truncate">
+                                Previous search
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </>
                 )}
 
@@ -386,7 +409,7 @@ export function SearchBar({
                     </div>
                   )}
               </div>
-            </ScrollArea>
+            </div>
           </div>
         )}
       </div>
