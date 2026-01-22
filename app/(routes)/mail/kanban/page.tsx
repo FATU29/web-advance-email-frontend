@@ -314,6 +314,9 @@ export default function KanbanPage() {
 
     // If there are snoozed emails, set up intelligent polling
     if (snoozedEmails.length > 0) {
+      // Check immediately on mount/update
+      checkSnoozes();
+
       // Find the earliest expiry time
       const now = new Date().getTime();
       const nextExpiryTime = Math.min(
@@ -324,17 +327,22 @@ export default function KanbanPage() {
       const timeUntilExpiry = nextExpiryTime - now;
 
       // If an email is already expired or will expire soon, check frequently
-      if (timeUntilExpiry <= 60000) {
-        // Check every 10 seconds if expiry is within 1 minute
-        const interval = setInterval(checkSnoozes, 10000);
+      if (timeUntilExpiry <= 0) {
+        // Already expired, check every 5 seconds
+        const interval = setInterval(checkSnoozes, 5000);
+        return () => clearInterval(interval);
+      } else if (timeUntilExpiry <= 60000) {
+        // Check every 5 seconds if expiry is within 1 minute
+        const interval = setInterval(checkSnoozes, 5000);
         return () => clearInterval(interval);
       } else if (timeUntilExpiry <= 300000) {
-        // Check every 30 seconds if expiry is within 5 minutes
-        const interval = setInterval(checkSnoozes, 30000);
+        // Check every 15 seconds if expiry is within 5 minutes
+        const interval = setInterval(checkSnoozes, 15000);
         return () => clearInterval(interval);
       } else {
-        // Check every minute for longer snoozes
-        const interval = setInterval(checkSnoozes, 60000);
+        // For longer snoozes, schedule a check just before expiry
+        // Check every 30 seconds to be safe
+        const interval = setInterval(checkSnoozes, 30000);
         return () => clearInterval(interval);
       }
     }
@@ -342,7 +350,7 @@ export default function KanbanPage() {
     // No snoozed emails, no need to check
     return () => {};
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emails.length, kanbanBoardData]); // Re-run when email count or board changes
+  }, [emails, kanbanBoardData]); // Re-run when emails or board changes
 
   //Init event handle
   const handleMoveEmail = (emailId: string, targetColumnId: string) => {
